@@ -13,31 +13,17 @@ with open("secrets.txt", "r") as f:
         key, value = line.strip().split(":", 1)
         secrets[key] = value
 
-# openai.organization = "org-cSwRU2HIBymBxEijKOapuNID"
 openai.api_key = secrets["openai_api_key"]
 
-# openai.Model.list()
-HISTORY_PATH = './history.json'
+CONVERSATIONS_HISTORY_PATH = './conversations_history.json'
 HISTORY_WORD_LIMIT = 1000
 
-CONVERSATIONS_HISTORY_PATH = './conversations_history.json'
-
-CHATBOT_INTRO_MESSAGE = """The following is a conversation with an AI assistant [Bot]. The assistant is helpful, creative, clever, and very friendly. \n"""
+CHATBOT_INTRO_MESSAGE = "The following is a conversation with an AI assistant [Bot]. " \
+                        "The assistant is helpful, creative, clever, and very friendly. \n"
 RW = RandomWords()
 
 HUMAN_TOKEN = '[HUMAN]'
-BOT_TOKEN = '[Bot]'
-GLOBAL_SWITCH = False  # true = multiple user support = on
-
-
-# GLOBAL_SWITCH = True  # true = conversation history on., separate conversations
-
-
-# TODO: Add user support - for chat. telegram.
-#  how?
-#  Step 1: get telegram user
-#  Step 2: save active chat per-user
-#  Step 3: pass user to 'chat' method
+BOT_TOKEN = '[BOT]'
 
 class ChatBot:
     DEFAULT_CHAT_NAME = 'General'
@@ -60,7 +46,7 @@ class ChatBot:
         "/chats": "list_chats",
         "/switch_chat": "switch_chat",
         "/rename_chat": "rename_chat",
-        "/history": "_get_history",
+        "/history": "get_history",
         "/list_models": "list_models",
         "/switch_model": "switch_model",
     }
@@ -75,7 +61,7 @@ class ChatBot:
         json.dump(self._conversations_history, open(self._conversations_history_path, 'w'), indent=' ')
         # todo: Implement saving to database
 
-    def _get_history(self, chat=None, limit=10):
+    def get_history(self, chat=None, limit=10):
         if chat is None:
             chat = self._active_chat
         return self._conversations_history[chat][-limit:]
@@ -99,7 +85,7 @@ class ChatBot:
         self.chat_count += 1
 
     def _generate_new_chat_name(self):
-        # todo: rename chat according to its history
+        # todo: rename chat according to its history - get the syntactic analysis (from chatgpt, some lightweight model)
         today = datetime.datetime.now().strftime('%y%b%d')
         new_chat_name = f'{today}-{self._session_name}-{self.chat_count}'
         return new_chat_name
@@ -111,7 +97,7 @@ class ChatBot:
         if name is not None:
             if name in self._conversations_history:
                 self._active_chat = name
-                return f"Switched chat to {name} successfully"  # todo - log instead?
+                return f"Switched chat to {name} successfully"  # todo - log instead? And then send logs to user
             else:
                 try:
                     index = int(name)
@@ -120,7 +106,7 @@ class ChatBot:
         if index is not None:
             name = list(self._conversations_history.keys())[-index]
             self._active_chat = name
-            return f"Switched chat to {name} successfully"  # todo - log instead?
+            return f"Switched chat to {name} successfully"  # todo - log instead? And then send logs to user
         raise RuntimeError("Both name and index are missing")
 
     def rename_chat(self, new_name, target_chat=None):
@@ -133,10 +119,11 @@ class ChatBot:
         self._conversations_history[new_name] = self._conversations_history[target_chat]
         del self._conversations_history[target_chat]
 
-    def _calculate_history_depth(self, history):  # todo: static, based on word limit
+    @staticmethod
+    def calculate_history_depth(history, word_limit):
         num_items = 0
         num_words = 0
-        while num_words <= self._history_word_limit and num_items < len(history):
+        while num_words <= word_limit and num_items < len(history):
             num_words += len(history[-(num_items + 1)][0]) + len(history[-(num_items + 1)][1])
             num_items += 1
         return num_items
@@ -198,37 +185,23 @@ class ChatBot:
         :param kwargs:
         :return:
         """
-        # todo: implement commands
+        # todo: implement commands. Extract this into a separate method
         if prompt.startswith('/'):
             command, qargs, qkwargs = self.parse_query(prompt)
-            # match command:
-            #     case '/new_chat':
-            #         return self._start_new_chat(*qargs, **qkwargs)
-            #     case '/help':
-            #         return self.help(*qargs, **qkwargs)
-            #     case '/switch_chat':
-            #         return self._switch_chat(*qargs, **qkwargs)
-            #     case _:
-            #         # todo: log / reply instead? Telegram bot handler?
-            #         # raise RuntimeError(f"Unknown Command! {prompt}")
-            #         return f"Unknown Command! {prompt}"
-            if prompt.startswith('/new_chat'):
-                return self._start_new_chat(*qargs, **qkwargs)
-            elif prompt.startswith('/help'):
-                return self.help(*qargs, **qkwargs)
-            elif prompt.startswith('/switch_chat'):
-                return self._switch_chat(*qargs, **qkwargs)
-            elif prompt.startswith('/chats'):
-                return self._list_chats(*qargs, **qkwargs)
+            if command in self.commands:
+                func = self.__getattribute__(self.commands[command])
+                return func(*qargs, qkwargs)
             else:
                 raise RuntimeError(f"Unknown Command! {prompt}")
+            #         # todo: log / reply instead? Telegram bot handler?
+            #     return f"Unknown Command! {prompt}"
 
         # intro message for model
         augmented_prompt = CHATBOT_INTRO_MESSAGE
 
         # history - for context
-        full_history = self._get_history(limit=0)
-        history_depth = self._calculate_history_depth(full_history)
+        full_history = self.get_history(limit=0)
+        history_depth = self.calculate_history_depth(full_history, word_limit=self._history_word_limit)
         history = full_history[-history_depth:]
         for i in range(len(history)):
             augmented_prompt += f"{HUMAN_TOKEN}: {history[i][0]}\n{BOT_TOKEN}: {history[i][1]}\n"
