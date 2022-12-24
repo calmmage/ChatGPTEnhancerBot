@@ -1,19 +1,15 @@
-# a version that combines all parts of the code. MVP
-# uses 2_openai_chatbot
-# and semi-smart telegram bot on a better platform that just default python api.
-
-
 """a simple bot that just forwards queries to openai and sends the response"""
-import logging
 
+import logging
+from functools import wraps
+
+import openai
 from telegram import Update, ForceReply
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-from example.bot_python.openai_chatbot import ChatBot
-
 # Load the secrets from a file
 secrets = {}
-with open("secrets.txt", "r") as f:
+with open("../../chatgpt_enhancer_bot/secrets.txt", "r") as f:
     for line in f:
         key, value = line.strip().split(":", 1)
         secrets[key] = value
@@ -25,21 +21,14 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-WELCOME_MESSAGE = """This is an alpha version of the Petr Lavrov's ChatGPT enhancer.
-This message is last updated on 24.12.2022. Please ping t.me/petr_lavrov if I forgot to update it :)
-Please play around, but don't abuse too much. I run this for my own money...
-"""
-
 
 # Define a few command handlers. These usually take the two arguments update and
 # context.
 def start(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
     user = update.effective_user
-    welcome_message = fr'Hi {user.mention_markdown_v2()}\!'
-    welcome_message += WELCOME_MESSAGE
     update.message.reply_markdown_v2(
-        welcome_message,
+        fr'Hi {user.mention_markdown_v2()}\!',
         reply_markup=ForceReply(selective=True),
     )
 
@@ -49,23 +38,46 @@ def help_command(update: Update, context: CallbackContext) -> None:
     update.message.reply_text('Help!')
 
 
-bots = {}  # Dict[str, ChatBot]
+def telegram_decorator(func, **kwargs):
+    @wraps(func)
+    def wrapper(update: Update, context: CallbackContext) -> None:
+        response = func(update.message.text, **kwargs)
+        update.message.reply_text(response)
 
-default_model = "text-ada:001"
-
-
-def chat(prompt, user):
-    if user not in bots:
-        history_path = f'./history/history_{user}.json'
-        new_bot = ChatBot(conversations_history_path=history_path, model=default_model)
-        bots[user] = new_bot
-    bot = bots[user]
-    return bot.chat(prompt=prompt)
+    return wrapper
 
 
-def chat_handler(update: Update, context: CallbackContext) -> None:
-    response = chat(update.message.text, user=update.effective_user.username)
-    update.message.reply_text(response)
+# openai.organization = "org-cSwRU2HIBymBxEijKOapuNID"
+openai.api_key = secrets["openai_api_key"]
+
+
+# openai.Model.list()
+
+def chatbot(prompt, model='text-ada:001', max_tokens=500,
+            **kwargs):
+    """
+    https://beta.openai.com/docs/api-reference/completions/create
+
+    :param prompt:
+    :param model: For testing purposes - cheap - 'text-ada:001'. For real purposes - "text-davinci-003" - expensive!
+    :param temperature:
+    :param max_tokens:
+    :param top_p:
+    :param n:
+    :param stream:
+    :param stop:
+    :param kwargs:
+    :return:
+    """
+    # Send the message to the OpenAI API
+    response = openai.Completion.create(model=model, prompt=prompt, max_tokens=max_tokens,
+                                        **kwargs)
+
+    # Extract the response from the API response
+    response_text = response['choices'][0]['text']
+
+    # Return the response to the user
+    return response_text
 
 
 def main(expensive: bool) -> None:
@@ -85,12 +97,10 @@ def main(expensive: bool) -> None:
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help_command))
 
-    # b = ChatBot()
-    globals()['default_model'] = "text-davinci-003" if expensive else "text-ada:001"
+    model = "text-davinci-003" if expensive else "text-ada:001"
     # on non command i.e message - echo the message on Telegram
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, chat_handler
-                                          # telegram_user_decorator(b.chat, model=model)
-                                          ))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command,
+                                          telegram_decorator(chatbot, model=model)))
 
     # Start the Bot
     updater.start_polling()

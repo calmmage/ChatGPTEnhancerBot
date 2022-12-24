@@ -15,7 +15,7 @@ with open("secrets.txt", "r") as f:
 
 openai.api_key = secrets["openai_api_key"]
 
-CONVERSATIONS_HISTORY_PATH = './conversations_history.json'
+CONVERSATIONS_HISTORY_PATH = '../example/bot_python/conversations_history.json'
 HISTORY_WORD_LIMIT = 1000
 
 CHATBOT_INTRO_MESSAGE = "The following is a conversation with an AI assistant [Bot]. " \
