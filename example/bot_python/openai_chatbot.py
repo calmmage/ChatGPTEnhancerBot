@@ -39,7 +39,9 @@ GLOBAL_SWITCH = False  # true = multiple user support = on
 #  Step 3: pass user to 'chat' method
 
 class ChatBot:
-    def __init__(self, history_path=HISTORY_PATH, history_word_limit=HISTORY_WORD_LIMIT, conversations_history_path=CONVERSATIONS_HISTORY_PATH):
+    def __init__(self, model="text-ada:001", history_word_limit=HISTORY_WORD_LIMIT,  # history_path=HISTORY_PATH,
+                 conversations_history_path=CONVERSATIONS_HISTORY_PATH):
+        self.model = model
         self.chat_count = 0
         self._session_name = RW.get_random_word()  # random-word
 
@@ -197,7 +199,12 @@ class ChatBot:
         # todo: check model is valid
         self.model = model
 
-    def chat(self, prompt, model='text-ada:001', max_tokens=512, user=None,  # temperature=0.5, top_p=1, n=1, stream=False, stop="\n",
+    def list_models(self):
+        models_list = openai.Model.list()
+        return [m.id for m in models_list]
+
+    def chat(self, prompt, model=None, max_tokens=512,
+             # temperature=0.5, top_p=1, n=1, stream=False, stop="\n",
              **kwargs):
         """
         https://beta.openai.com/docs/api-reference/completions/create
@@ -248,6 +255,8 @@ class ChatBot:
         augmented_prompt += f"{HUMAN_TOKEN}: {prompt}\n"
 
         # Send the message to the OpenAI API
+        if model is None:
+            model = self.model
         response = openai.Completion.create(model=model, prompt=augmented_prompt, max_tokens=max_tokens
                                             # todo: pass hash of user
                                             # , temperature=temperature,
