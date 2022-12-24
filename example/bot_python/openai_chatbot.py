@@ -19,15 +19,19 @@ openai.api_key = secrets["openai_api_key"]
 HISTORY_PATH = './history.json'
 HISTORY_WORD_LIMIT = 1000
 
-CONVERSATIONS_HISTORY_PATH =  './conversations_history.json'
+CONVERSATIONS_HISTORY_PATH = './conversations_history.json'
 
 CHATBOT_INTRO_MESSAGE = """The following is a conversation with an AI assistant [Bot]. The assistant is helpful, creative, clever, and very friendly. \n"""
 RW = RandomWords()
 
 HUMAN_TOKEN = '[HUMAN]'
 BOT_TOKEN = '[Bot]'
-# GLOBAL_SWITCH = False  # true = conversation history on., separate conversations
-GLOBAL_SWITCH = True  # true = conversation history on., separate conversations
+GLOBAL_SWITCH = False  # true = multiple user support = on
+
+
+# GLOBAL_SWITCH = True  # true = conversation history on., separate conversations
+
+
 # TODO: Add user support - for chat. telegram.
 #  how?
 #  Step 1: get telegram user
@@ -37,10 +41,10 @@ GLOBAL_SWITCH = True  # true = conversation history on., separate conversations
 class ChatBot:
     def __init__(self, history_path=HISTORY_PATH, history_word_limit=HISTORY_WORD_LIMIT, conversations_history_path=CONVERSATIONS_HISTORY_PATH):
         self.chat_count = 0
-        self._session_name = RW.get_random_word() # random-word
+        self._session_name = RW.get_random_word()  # random-word
 
-        self._history_path = history_path
-        self._history = self._load_history()
+        # self._history_path = history_path
+        # self._history = self._load_history()
         self._history_word_limit = history_word_limit
 
         self._conversations_history_path = conversations_history_path
@@ -53,9 +57,15 @@ class ChatBot:
         else:
             return []  # todo: implement loading from database
 
-    def _save_history(self):
-        json.dump(self._history, open(self._history_path, 'w'), indent=' ')
-        # pass  # todo: Implement saving to database
+    # def _load_history(self):
+    #     if os.path.exists(self._history_path):
+    #         return json.load(open(self._history_path))
+    #     else:
+    #         return []  # todo: implement loading from database
+
+    # def _save_history(self):
+    #     json.dump(self._history, open(self._history_path, 'w'), indent=' ')
+    #     # pass  # todo: Implement saving to database
 
     def _load_conversations_history(self):
         if os.path.exists(self._conversations_history_path):
@@ -67,28 +77,26 @@ class ChatBot:
         json.dump(self._conversations_history, open(self._conversations_history_path, 'w'), indent=' ')
         # todo: Implement saving to database
 
-    def _get_history(self, chat=None, user=None):
-        # if GLOBAL_SWITCH:
-            if chat is None:
-                chat = self._active_chat
-            return self._conversations_history[chat]
+    def _get_history(self, chat=None, limit=10):
+        # if GLOBAL_SWITCH:  # user support
+        #     raise NotImplemented()
         # else:
-        #     return self._history
+        if chat is None:
+            chat = self._active_chat
+        return self._conversations_history[chat][-limit:]
 
-    def _record_history(self, prompt, response_text, chat=None, user=None):  # todo: save to proper database
-        # if GLOBAL_SWITCH:
-            if chat is None:
-                chat = self._active_chat
-
-            timestamp = datetime.datetime.now()
-            self._conversations_history[chat].append((prompt, response_text, timestamp.isoformat()))
-            self._save_conversations_history()
+    def _record_history(self, prompt, response_text, chat=None):  # todo: save to proper database
+        # if GLOBAL_SWITCH:  # user support
+        #     raise NotImplemented()
         # else:
-        #     timestamp = datetime.datetime.now()
-        #     self._history.append((prompt, response_text, timestamp))
-        #     self._save_history()
+        if chat is None:
+            chat = self._active_chat
 
-    def _start_new_chat(self, name=None, user=None):
+        timestamp = datetime.datetime.now()
+        self._conversations_history[chat].append((prompt, response_text, timestamp.isoformat()))
+        self._save_conversations_history()
+
+    def _start_new_chat(self, name=None):
         if name is None:
             name = self._generate_new_chat_name()
         if name in self._conversations_history:
@@ -98,7 +106,8 @@ class ChatBot:
         self._conversations_history[self._active_chat] = []
         self.chat_count += 1
 
-    def _generate_new_chat_name(self, user=None):
+    def _generate_new_chat_name(self):
+        # todo: rename chat according to its history
         today = datetime.datetime.now().strftime('%y%b%d')
         new_chat_name = f'{today}-{self._session_name}-{self.chat_count}'
         return new_chat_name
@@ -107,13 +116,25 @@ class ChatBot:
         return list(self._conversations_history.keys())[-limit:]
 
     # todo: rename chat
-    def _switch_chat(self, name=None, index=None, user=None): # todo: support user
+    def _switch_chat(self, name=None, index=None):  # todo: support user
+        #
+        # if GLOBAL_SWITCH:  # user support
+        #     target_chat
+        #     # todo: check that it's this user's chat
+        #     # todo: maybe it's not such a good idea storing all user's data on same process.. How can I separate it.
+        #     #  Well, it's not a problem I want to start solving for now..
+        #
+        #     # how about I create a separate chat-bot for everyone? For each new user. Yep.
+        #     # That should be better and more obvious solution.
+        #     self._active_chat_by_user[user] = target_chat
+        #     raise NotImplemented()
+        # else:
         # check if name is indes intead
 
         if name is not None:
             if name in self._conversations_history:
                 self._active_chat = name
-                return f"Switched chat to {name} successfully" # todo - log instead?
+                return f"Switched chat to {name} successfully"  # todo - log instead?
             else:
                 try:
                     index = int(name)
@@ -122,10 +143,10 @@ class ChatBot:
         if index is not None:
             name = list(self._conversations_history.keys())[-index]
             self._active_chat = name
-            return f"Switched chat to {name} successfully" # todo - log instead?
+            return f"Switched chat to {name} successfully"  # todo - log instead?
         raise RuntimeError("Both name and index are missing")
 
-    def _calculate_history_depth(self, history): # todo: static, based on word limit
+    def _calculate_history_depth(self, history):  # todo: static, based on word limit
         num_items = 0
         num_words = 0
         while num_words <= self._history_word_limit and num_items < len(history):
@@ -169,10 +190,6 @@ class ChatBot:
         :param model: For testing purposes - cheap - 'text-ada:001'. For real purposes - "text-davinci-003" - expensive!
         :param temperature: 0-1
         :param max_tokens: 16-4096
-        :param top_p:
-        :param n:
-        :param stream:
-        :param stop:
         :param kwargs:
         :return:
         """
@@ -205,7 +222,7 @@ class ChatBot:
         augmented_prompt = CHATBOT_INTRO_MESSAGE
 
         # history - for context
-        full_history = self._get_history(user=user)
+        full_history = self._get_history(limit=0)
         history_depth = self._calculate_history_depth(full_history)
         history = full_history[-history_depth:]
         for i in range(len(history)):
@@ -227,7 +244,7 @@ class ChatBot:
             response_text = response_text[len(BOT_TOKEN) + 2:]
 
         # Update the conversation history
-        self._record_history(prompt, response_text, user=user)
+        self._record_history(prompt, response_text)
 
         # Return the response to the user
         return response_text
