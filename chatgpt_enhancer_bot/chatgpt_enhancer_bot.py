@@ -5,7 +5,7 @@
 
 """a simple bot that just forwards queries to openai and sends the response"""
 import logging
-
+import os
 from telegram import Update, ForceReply
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
