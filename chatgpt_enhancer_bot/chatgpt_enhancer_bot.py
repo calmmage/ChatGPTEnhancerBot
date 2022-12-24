@@ -9,7 +9,7 @@ import logging
 from telegram import Update, ForceReply
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-from chatgpt_enhancer_bot.openai_chatbot import ChatBot
+from openai_chatbot import ChatBot
 
 # Load the secrets from a file
 secrets = {}
@@ -53,8 +53,11 @@ bots = {}  # Dict[str, ChatBot]
 
 default_model = "text-ada:001"
 
+if not os.path.exists('./history'):
+    os.mkdir('./history')
 
 def chat(prompt, user):
+
     if user not in bots:
         history_path = f'./history/history_{user}.json'
         new_bot = ChatBot(conversations_history_path=history_path, model=default_model)
