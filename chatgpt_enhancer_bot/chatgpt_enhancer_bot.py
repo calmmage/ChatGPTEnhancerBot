@@ -8,13 +8,14 @@ import logging
 import os
 import time
 import traceback
+from typing import Dict
 
 from telegram import Update
 from telegram.error import NetworkError
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 from openai_chatbot import ChatBot
-from utils import get_secrets
+from utils import get_secrets, generate_funny_reason, generate_funny_consolation
 
 secrets = get_secrets()
 
@@ -52,7 +53,7 @@ def start(update: Update, context: CallbackContext) -> None:
 #     update.message.reply_text('Help!')
 
 
-bots = {}  # Dict[str, ChatBot]
+bots = {}  # type: Dict[str, ChatBot]
 
 default_model = "text-ada:001"
 
@@ -84,10 +85,29 @@ def error_handler(update: Update, context: CallbackContext):
         # Do something when the "Bad Gateway" error occurs
         logger.info('NetworkError occurred')
         time.sleep(1)
+
     else:
         # todo: send error to admin - petrlavrov
         # for now: just log
         logger.warning(traceback.format_exc())
+
+    # todo: send user the info
+    funny_reason = generate_funny_reason()
+    update.message.reply_text(
+        f"Sorry, {funny_reason}. Someday I will make a /dev command to see the traceback.. For now - Retrying")
+    # todo: create a /dev command to get the traceback
+    try:
+        prompt = update.message.text
+        user = update.effective_user.username
+        # if command appeared
+        if prompt.startswith('/'):
+            # todo: handle command
+            # bots[user].
+            pass
+        else:
+            chat(prompt, user)
+    except:
+        update.message.reply_text(f"Nah, it's hopeless.. {generate_funny_consolation()}")
 
 
 def main(expensive: bool) -> None:
