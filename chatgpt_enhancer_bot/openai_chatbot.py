@@ -47,6 +47,7 @@ class ChatBot:
         self._conversations_history_path = conversations_history_path
         self._conversations_history = self._load_conversations_history()  # attempt to make 'new chat' a thing
         # self._start_new_chat()
+        self._traceback = []
 
     commands = {
         "/help": "help",
@@ -57,6 +58,7 @@ class ChatBot:
         "/history": "get_history",
         "/list_models": "list_models",
         "/switch_model": "switch_model",
+        "/dev": "get_traceback",
     }
 
     def _load_conversations_history(self):
@@ -70,6 +72,12 @@ class ChatBot:
         # todo: Implement saving to database
 
     def get_history(self, chat=None, limit=10):
+        """
+        Get conversation history for a particular chat
+        :param chat: what context/thread to use. By default - current
+        :param limit: Max messages from history
+        :return: List[Tuple(prompt, response)]
+        """
         if chat is None:
             chat = self._active_chat
         return self._conversations_history[chat][-limit:]
@@ -220,6 +228,15 @@ class ChatBot:
         """
         models_list = openai.Model.list()  # todo: pretty print
         return [m.id for m in models_list]
+
+    def save_traceback(self, msg):
+        self._traceback.append(msg)
+
+    def get_traceback(self, limit=1):
+        return self._traceback[-limit:]
+
+    # ------------------------------
+    # Main chat method
 
     def chat(self, prompt, model=None, max_tokens=512,
              # temperature=0.5, top_p=1, n=1, stream=False, stop="\n",

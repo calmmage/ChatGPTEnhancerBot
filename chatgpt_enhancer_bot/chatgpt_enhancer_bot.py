@@ -98,15 +98,18 @@ def error_handler(update: Update, context: CallbackContext):
     # Give user the info? Naah, let's rather joke around
     funny_reason = generate_funny_reason().lower()
     update.message.reply_text(
-        f"Sorry, {funny_reason}. Someday I will make a /dev command to see the traceback.. For now - Retrying")
+        f"Sorry, {funny_reason}. You can use /dev command to see the traceback.. For now - Retrying")
     # todo: create a /dev command to get the traceback
+    prompt = update.message.text
+    user = update.effective_user.username
     try:
-        prompt = update.message.text
-        user = update.effective_user.username
+        # todo: retrying the 'new_chat' command is stupid
         # do I need to process the commands differently? I have a special parser inside chat() method.. should be ok
         time.sleep(5)  # give it some time...
         chat(prompt, user)
     except Exception as e:
+        bot = get_bot(user)
+        bot.save_traceback(traceback.format_exc())
         update.message.reply_text(f"Nah, it's hopeless.. {generate_funny_consolation().lower()}")
 
 
@@ -119,6 +122,8 @@ def make_command_handler(method_name):
         prompt = update.message.text
         command, qargs, qkwargs = bot.parse_query(prompt)
         result = method(*qargs, **qkwargs)  # todo: parse kwargs from the command
+        if not result:
+            result = f"Command {command} finished successfully"
         update.message.reply_text(result)
 
     return command_handler
