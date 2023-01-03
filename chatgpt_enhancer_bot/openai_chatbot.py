@@ -6,12 +6,9 @@ import os.path
 import openai
 from random_word import RandomWords
 
-# Load the secrets from a file
-secrets = {}
-with open("secrets.txt", "r") as f:
-    for line in f:
-        key, value = line.strip().split(":", 1)
-        secrets[key] = value
+from utils import get_secrets
+
+secrets = get_secrets()
 
 openai.api_key = secrets["openai_api_key"]
 
@@ -19,11 +16,13 @@ CONVERSATIONS_HISTORY_PATH = '../example/bot_python/conversations_history.json'
 HISTORY_WORD_LIMIT = 1000
 
 CHATBOT_INTRO_MESSAGE = "The following is a conversation with an AI assistant [Bot]. " \
-                        "The assistant is helpful, creative, clever, and very friendly. \n"
+                        "The assistant is helpful, creative, clever, and very friendly. " \
+                        "The bot was created by OpenAI team and enhanced by Petr Lavrov \n"
 RW = RandomWords()
 
 HUMAN_TOKEN = '[HUMAN]'
 BOT_TOKEN = '[BOT]'
+
 
 class ChatBot:
     DEFAULT_CHAT_NAME = 'General'

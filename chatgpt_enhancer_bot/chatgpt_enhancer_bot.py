@@ -6,17 +6,15 @@
 """a simple bot that just forwards queries to openai and sends the response"""
 import logging
 import os
-from telegram import Update, ForceReply
+import time
+
+from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 from openai_chatbot import ChatBot
+from utils import get_secrets
 
-# Load the secrets from a file
-secrets = {}
-with open("secrets.txt", "r") as f:
-    for line in f:
-        key, value = line.strip().split(":", 1)
-        secrets[key] = value
+secrets = get_secrets()
 
 # Enable logging
 logging.basicConfig(
@@ -26,9 +24,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 WELCOME_MESSAGE = """This is an alpha version of the Petr Lavrov's ChatGPT enhancer.
-This message is last updated on 24.12.2022. Please ping t.me/petr_lavrov if I forgot to update it :)
-Please play around, but don't abuse too much. I run this for my own money...
+This message is last updated on 03.01.2023. Please ping t.me/petr_lavrov if I forgot to update it :)
+Please play around, but don't abuse too much. I run this for my own money... It's ok if you send ~100 messages
 """
+
+TOUCH_FILE_PATH = os.path.expanduser('~/heartbeat/chatgpt_enhancer_last_alive')
+os.makedirs(os.path.dirname(TOUCH_FILE_PATH), exist_ok=True)
 
 
 # Define a few command handlers. These usually take the two arguments update and
@@ -36,17 +37,17 @@ Please play around, but don't abuse too much. I run this for my own money...
 def start(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
     user = update.effective_user
-    welcome_message = fr'Hi {user.mention_markdown_v2()}\!'
+    welcome_message = f'Hi {user.username}!\n'
     welcome_message += WELCOME_MESSAGE
-    update.message.reply_markdown_v2(
+    update.message.reply_text(
         welcome_message,
-        reply_markup=ForceReply(selective=True),
+        # reply_markup=ForceReply(selective=True),
     )
 
 
-def help_command(update: Update, context: CallbackContext) -> None:
-    """Send a message when the command /help is issued."""
-    update.message.reply_text('Help!')
+# def help_command(update: Update, context: CallbackContext) -> None:
+#     """Send a message when the command /help is issued."""
+#     update.message.reply_text('Help!')
 
 
 bots = {}  # Dict[str, ChatBot]
@@ -56,8 +57,8 @@ default_model = "text-ada:001"
 if not os.path.exists('./history'):
     os.mkdir('./history')
 
-def chat(prompt, user):
 
+def chat(prompt, user):
     if user not in bots:
         history_path = f'./history/history_{user}.json'
         new_bot = ChatBot(conversations_history_path=history_path, model=default_model)
@@ -86,7 +87,7 @@ def main(expensive: bool) -> None:
 
     # on different commands - answer in Telegram
     dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("help", help_command))
+    # dispatcher.add_handler(CommandHandler("help", help_command))
 
     # b = ChatBot()
     globals()['default_model'] = "text-davinci-003" if expensive else "text-ada:001"
@@ -101,7 +102,16 @@ def main(expensive: bool) -> None:
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
-    updater.idle()
+    count = 0
+    while True:
+        time.sleep(1)
+
+        # heartbeat
+        count += 1
+        if count % 60 == 0:
+            # touch the touch file
+            with open(TOUCH_FILE_PATH, 'w'):
+                pass
 
 
 if __name__ == '__main__':
