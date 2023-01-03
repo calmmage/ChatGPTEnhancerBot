@@ -43,9 +43,22 @@ def start(update: Update, context: CallbackContext) -> None:
     )
 
 
-def help_command(update: Update, context: CallbackContext) -> None:
-    """Send a message when the command /help is issued."""
-    update.message.reply_text('Help!')
+class TestCommandSource:
+    commands = {
+        '/command': 'test_command',
+        '/help': 'help'
+    }
+
+    def test_command(self):
+        return "Test command activated"
+
+    def help(self):
+        return "Help command activated"
+
+
+# def help_command(update: Update, context: CallbackContext) -> None:
+#     """Send a message when the command /help is issued."""
+#     update.message.reply_text('Help!')
 
 
 def telegram_decorator(func, **kwargs):
@@ -64,6 +77,16 @@ def echo(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(reply_text_message)
 
 
+def handle_commands(func):
+    def command_handler(update: Update, context: CallbackContext) -> None:
+        # user = ...
+        # bot = ...
+        # todo: parse arguments from the prompt
+        update.message.reply_text(func())
+
+    return command_handler
+
+
 def main(expensive: bool) -> None:
     """
     Start the bot
@@ -79,7 +102,12 @@ def main(expensive: bool) -> None:
 
     # on different commands - answer in Telegram
     dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("help", help_command))
+    # dispatcher.add_handler(CommandHandler("help", help_command))
+    # add commands
+    cs = TestCommandSource()
+    for command in TestCommandSource.commands:
+        func = cs.__getattribute__(TestCommandSource.commands[command])
+        dispatcher.add_handler(CommandHandler(command.rstrip('/'), handle_commands(func)))
 
     model = "text-davinci-003" if expensive else "text-ada:001"
     # on non command i.e message - echo the message on Telegram
