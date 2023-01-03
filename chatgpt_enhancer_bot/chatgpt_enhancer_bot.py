@@ -61,12 +61,16 @@ history_dir = os.path.join(os.path.dirname(__file__), 'history')
 os.makedirs(history_dir, exist_ok=True)
 
 
-def chat(prompt, user):
+def get_bot(user):
     if user not in bots:
         history_path = os.path.join(history_dir, f'history_{user}.json')
         new_bot = ChatBot(conversations_history_path=history_path, model=default_model)
         bots[user] = new_bot
-    bot = bots[user]
+    return bots[user]
+
+
+def chat(prompt, user):
+    bot = get_bot(user)
     return bot.chat(prompt=prompt)
 
 
@@ -91,23 +95,33 @@ def error_handler(update: Update, context: CallbackContext):
         # for now: just log
         logger.warning(traceback.format_exc())
 
-    # todo: send user the info
-    funny_reason = generate_funny_reason()
+    # Give user the info? Naah, let's rather joke around
+    funny_reason = generate_funny_reason().lower()
     update.message.reply_text(
         f"Sorry, {funny_reason}. Someday I will make a /dev command to see the traceback.. For now - Retrying")
     # todo: create a /dev command to get the traceback
     try:
         prompt = update.message.text
         user = update.effective_user.username
-        # if command appeared
-        if prompt.startswith('/'):
-            # todo: handle command
-            # bots[user].
-            pass
-        else:
-            chat(prompt, user)
-    except:
-        update.message.reply_text(f"Nah, it's hopeless.. {generate_funny_consolation()}")
+        # do I need to process the commands differently? I have a special parser inside chat() method.. should be ok
+        time.sleep(5)  # give it some time...
+        chat(prompt, user)
+    except Exception as e:
+        update.message.reply_text(f"Nah, it's hopeless.. {generate_funny_consolation().lower()}")
+
+
+def make_command_handler(method_name):
+    def command_handler(update: Update, context: CallbackContext) -> None:
+        user = update.effective_user.username
+        bot = get_bot(user)
+        method = bot.__getattribute__(method_name)
+
+        prompt = update.message.text
+        command, qargs, qkwargs = bot.parse_query(prompt)
+        result = method(*qargs, **qkwargs)  # todo: parse kwargs from the command
+        update.message.reply_text(result)
+
+    return command_handler
 
 
 def main(expensive: bool) -> None:
@@ -133,6 +147,10 @@ def main(expensive: bool) -> None:
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, chat_handler
                                           # telegram_user_decorator(b.chat, model=model)
                                           ))
+
+    for command, method_name in ChatBot.commands.items():
+        command_handler = make_command_handler(method_name)
+        dispatcher.add_handler(CommandHandler(command.strip('/'), command_handler))
 
     # Add the error handler to the dispatcher
     dispatcher.add_error_handler(error_handler)

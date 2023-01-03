@@ -19,7 +19,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 
 # Load the secrets from a file
 secrets = {}
-with open("../../chatgpt_enhancer_bot/secrets.txt", "r") as f:
+with open("secrets.txt", "r") as f:
     for line in f:
         key, value = line.strip().split(":", 1)
         secrets[key] = value
@@ -45,7 +45,7 @@ def start(update: Update, context: CallbackContext) -> None:
 
 class TestCommandSource:
     commands = {
-        '/command': 'test_command',
+        '/test': 'test_command',
         '/help': 'help'
     }
 
@@ -54,6 +54,25 @@ class TestCommandSource:
 
     def help(self):
         return "Help command activated"
+
+    @staticmethod
+    def parse_query(query):
+        """format: "/command arg1 arg2 key3=arg3" """
+        parts = query.strip().split()
+        if parts[0].startswith('/'):
+            command = parts[0]
+            parts = parts[1:]
+        else:
+            raise RuntimeError(f"command not included? {query}")
+        args = []
+        kwargs = {}
+        for p in parts:
+            if '=' in p:
+                k, v = p.split('=')
+                kwargs[k] = v
+            else:
+                args.append(p)
+        return command, args, kwargs
 
 
 # def help_command(update: Update, context: CallbackContext) -> None:
@@ -77,16 +96,6 @@ def echo(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(reply_text_message)
 
 
-def handle_commands(func):
-    def command_handler(update: Update, context: CallbackContext) -> None:
-        # user = ...
-        # bot = ...
-        # todo: parse arguments from the prompt
-        update.message.reply_text(func())
-
-    return command_handler
-
-
 def main(expensive: bool) -> None:
     """
     Start the bot
@@ -105,9 +114,25 @@ def main(expensive: bool) -> None:
     # dispatcher.add_handler(CommandHandler("help", help_command))
     # add commands
     cs = TestCommandSource()
-    for command in TestCommandSource.commands:
-        func = cs.__getattribute__(TestCommandSource.commands[command])
-        dispatcher.add_handler(CommandHandler(command.rstrip('/'), handle_commands(func)))
+
+    def make_command_handler(method_name):
+        def command_handler(update: Update, context: CallbackContext) -> None:
+            bot = cs
+            method = bot.__getattribute__(method_name)
+
+            prompt = update.message.text
+            command, qargs, qkwargs = bot.parse_query(prompt)
+            result = method(*qargs, **qkwargs)  # todo: parse kwargs from the command
+            update.message.reply_text(result)
+
+        return command_handler
+
+    for command, method_name in TestCommandSource.commands.items():
+        # logger.info(command, method_name )
+        # func = cs.__getattribute__()
+        # method_name = TestCommandSource.commands[command]
+        handler = make_command_handler(method_name)
+        dispatcher.add_handler(CommandHandler(command.lstrip('/'), handler))
 
     model = "text-davinci-003" if expensive else "text-ada:001"
     # on non command i.e message - echo the message on Telegram
