@@ -7,12 +7,15 @@
 import logging
 import os
 import time
+import traceback
+from typing import Dict
 
 from telegram import Update
+from telegram.error import NetworkError
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 from openai_chatbot import ChatBot
-from utils import get_secrets
+from utils import get_secrets, generate_funny_reason, generate_funny_consolation
 
 secrets = get_secrets()
 
@@ -50,26 +53,75 @@ def start(update: Update, context: CallbackContext) -> None:
 #     update.message.reply_text('Help!')
 
 
-bots = {}  # Dict[str, ChatBot]
+bots = {}  # type: Dict[str, ChatBot]
 
 default_model = "text-ada:001"
 
-if not os.path.exists('./history'):
-    os.mkdir('./history')
+history_dir = os.path.join(os.path.dirname(__file__), 'history')
+os.makedirs(history_dir, exist_ok=True)
+
+
+def get_bot(user):
+    if user not in bots:
+        history_path = os.path.join(history_dir, f'history_{user}.json')
+        new_bot = ChatBot(conversations_history_path=history_path, model=default_model)
+        bots[user] = new_bot
+    return bots[user]
 
 
 def chat(prompt, user):
-    if user not in bots:
-        history_path = f'./history/history_{user}.json'
-        new_bot = ChatBot(conversations_history_path=history_path, model=default_model)
-        bots[user] = new_bot
-    bot = bots[user]
+    bot = get_bot(user)
     return bot.chat(prompt=prompt)
 
 
 def chat_handler(update: Update, context: CallbackContext) -> None:
     response = chat(update.message.text, user=update.effective_user.username)
     update.message.reply_text(response)
+
+
+# Enable logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+
+# Define the error handler function
+def error_handler(update: Update, context: CallbackContext):
+    if isinstance(context.error, NetworkError):
+        # Do something when the "Bad Gateway" error occurs
+        logger.info('NetworkError occurred')
+        time.sleep(1)
+
+    else:
+        # todo: send error to admin - petrlavrov
+        # for now: just log
+        logger.warning(traceback.format_exc())
+
+    # Give user the info? Naah, let's rather joke around
+    funny_reason = generate_funny_reason().lower()
+    update.message.reply_text(
+        f"Sorry, {funny_reason}. Someday I will make a /dev command to see the traceback.. For now - Retrying")
+    # todo: create a /dev command to get the traceback
+    try:
+        prompt = update.message.text
+        user = update.effective_user.username
+        # do I need to process the commands differently? I have a special parser inside chat() method.. should be ok
+        time.sleep(5)  # give it some time...
+        chat(prompt, user)
+    except Exception as e:
+        update.message.reply_text(f"Nah, it's hopeless.. {generate_funny_consolation().lower()}")
+
+
+def make_command_handler(method_name):
+    def command_handler(update: Update, context: CallbackContext) -> None:
+        user = update.effective_user.username
+        bot = get_bot(user)
+        method = bot.__getattribute__(method_name)
+
+        prompt = update.message.text
+        command, qargs, qkwargs = bot.parse_query(prompt)
+        result = method(*qargs, **qkwargs)  # todo: parse kwargs from the command
+        update.message.reply_text(result)
+
+    return command_handler
 
 
 def main(expensive: bool) -> None:
@@ -95,6 +147,13 @@ def main(expensive: bool) -> None:
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, chat_handler
                                           # telegram_user_decorator(b.chat, model=model)
                                           ))
+
+    for command, method_name in ChatBot.commands.items():
+        command_handler = make_command_handler(method_name)
+        dispatcher.add_handler(CommandHandler(command.strip('/'), command_handler))
+
+    # Add the error handler to the dispatcher
+    dispatcher.add_error_handler(error_handler)
 
     # Start the Bot
     updater.start_polling()
