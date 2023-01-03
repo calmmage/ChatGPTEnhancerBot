@@ -7,8 +7,10 @@
 import logging
 import os
 import time
+import traceback
 
 from telegram import Update
+from telegram.error import NetworkError
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 from openai_chatbot import ChatBot
@@ -54,13 +56,13 @@ bots = {}  # Dict[str, ChatBot]
 
 default_model = "text-ada:001"
 
-if not os.path.exists('./history'):
-    os.mkdir('./history')
+history_dir = os.path.join(os.path.dirname(__file__), 'history')
+os.makedirs(history_dir, exist_ok=True)
 
 
 def chat(prompt, user):
     if user not in bots:
-        history_path = f'./history/history_{user}.json'
+        history_path = os.path.join(history_dir, f'history_{user}.json')
         new_bot = ChatBot(conversations_history_path=history_path, model=default_model)
         bots[user] = new_bot
     bot = bots[user]
@@ -70,6 +72,22 @@ def chat(prompt, user):
 def chat_handler(update: Update, context: CallbackContext) -> None:
     response = chat(update.message.text, user=update.effective_user.username)
     update.message.reply_text(response)
+
+
+# Enable logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+
+# Define the error handler function
+def error_handler(update: Update, context: CallbackContext):
+    if isinstance(context.error, NetworkError):
+        # Do something when the "Bad Gateway" error occurs
+        logger.info('NetworkError occurred')
+        time.sleep(1)
+    else:
+        # todo: send error to admin - petrlavrov
+        # for now: just log
+        logger.warning(traceback.format_exc())
 
 
 def main(expensive: bool) -> None:
@@ -95,6 +113,9 @@ def main(expensive: bool) -> None:
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, chat_handler
                                           # telegram_user_decorator(b.chat, model=model)
                                           ))
+
+    # Add the error handler to the dispatcher
+    dispatcher.add_error_handler(error_handler)
 
     # Start the Bot
     updater.start_polling()
