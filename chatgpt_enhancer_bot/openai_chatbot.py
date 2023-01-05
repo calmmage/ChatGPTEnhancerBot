@@ -50,15 +50,32 @@ class ChatBot:
         self._traceback = []
 
     commands = {
+        # todo: group commands by meaning
         "/help": "help",
+        # todo: register user (/start)
+        # todo:
+
+        # Chat management
         "/new_chat": "start_new_chat",
         "/chats": "list_chats",
         "/switch_chat": "switch_chat",
         "/rename_chat": "rename_chat",
         "/history": "get_history",
+        # todo: default = everytime new chat (and sometimes go back), or default = everytime same chat (and sometimes go to threads)
+        # todo: map discussions, summary. Group by topic. Depth Navigation.
+
+        # model configuration and preset
+        # todo: history tokens limit
+        # todo: temperature
+        # todo: response tokens limit
         "/list_models": "list_models",
         "/switch_model": "switch_model",
+        # todo: presets, menu
+
+        # dev
         "/dev": "get_traceback",
+
+        # todo: rewrite all commands as a separate wrapper methods, starting with _command
     }
 
     def _load_conversations_history(self):
