@@ -38,7 +38,7 @@ telegram_commands_registry = CommandRegistry()
 
 
 class ChatBot:
-    DEFAULT_CHAT_NAME = 'General'
+    DEFAULT_TOPIC_NAME = 'General'
 
     def __init__(self, model="text-ada:001", history_word_limit=HISTORY_WORD_LIMIT,  # history_path=HISTORY_PATH,
                  conversations_history_path=CONVERSATIONS_HISTORY_PATH):
@@ -47,10 +47,10 @@ class ChatBot:
         self._session_name = RW.get_random_word()  # random-word
         self._history_word_limit = history_word_limit
 
-        self._active_chat = self.DEFAULT_CHAT_NAME
+        self._active_chat = self.DEFAULT_TOPIC_NAME
         self._conversations_history_path = conversations_history_path
         self._conversations_history = self._load_conversations_history()  # attempt to make 'new chat' a thing
-        # self._start_new_chat()
+        # self._start_new_topic()
         self._traceback = []
 
     commands = {
@@ -60,9 +60,9 @@ class ChatBot:
         # todo:
 
         # Chat management
-        "/new_chat": "start_new_chat",
-        "/chats": "list_chats",
-        "/switch_chat": "switch_chat",
+        "/new_topic": "start_new_topic",
+        "/topics": "list_topics",
+        "/switch_topic": "switch_topic",
         "/rename_chat": "rename_chat",
         "/history": "get_history",
         # todo: default = everytime new chat (and sometimes go back), or default = everytime same chat (and sometimes go to threads)
@@ -87,7 +87,7 @@ class ChatBot:
         if os.path.exists(self._conversations_history_path):
             return json.load(open(self._conversations_history_path))
         else:
-            return {self.DEFAULT_CHAT_NAME: []}
+            return {self.DEFAULT_TOPIC_NAME: []}
 
     def _save_conversations_history(self):
         json.dump(self._conversations_history, open(self._conversations_history_path, 'w'), indent=' ')
@@ -112,14 +112,14 @@ class ChatBot:
         self._conversations_history[chat].append((prompt, response_text, timestamp.isoformat()))
         self._save_conversations_history()
 
-    def start_new_chat(self, name=None):
+    def start_new_topic(self, name=None):
         """
         Start a new conversation thread with clean context. Saves up the token quota.
         :param name: Name for a new chat (don't repeat yourself!)
         :return:
         """
         if name is None:
-            name = self._generate_new_chat_name()
+            name = self._generate_new_topic_name()
         if name in self._conversations_history:
             # todo: process properly? Switch instead?
             raise RuntimeError("Chat already exists")
@@ -128,21 +128,21 @@ class ChatBot:
         self.chat_count += 1
         # todo: name a chat accordingly, after a few messages
 
-    def _generate_new_chat_name(self):
+    def _generate_new_topic_name(self):
         # todo: rename chat according to its history - get the syntactic analysis (from chatgpt, some lightweight model)
         today = datetime.datetime.now().strftime('%y%b%d')
-        new_chat_name = f'{today}-{self._session_name}-{self.chat_count}'
-        return new_chat_name
+        new_topic_name = f'{today}-{self._session_name}-{self.chat_count}'
+        return new_topic_name
 
-    def list_chats(self, limit=10):
-        """ List 10 most recent chats. Use /list_chats 0 to list all chats
+    def list_topics(self, limit=10):
+        """ List 10 most recent topics. Use /list_topics 0 to list all topics
 
-        :param limit: Num chats to list. Default - 10. To get all chats - set to 0
+        :param limit: Num topics to list. Default - 10. To get all topics - set to 0
         :return:
         """
         return list(self._conversations_history.keys())[-limit:]
 
-    def switch_chat(self, name=None, index=None):
+    def switch_topic(self, name=None, index=None):
         """
         Switch ChatGPT context to another thread of discussion. Provide name or index of the chat to switch
         :param name:
@@ -161,25 +161,34 @@ class ChatBot:
         if index is not None:
             name = list(self._conversations_history.keys())[-index]
             self._active_chat = name
-            return f"Switched chat to {name} successfully"  # todo - log instead? And then send logs to user
+            return f"Active topic: {name}"  # todo - log instead? And then send logs to user
         raise RuntimeError("Both name and index are missing")
 
-    def rename_chat(self, new_name, target_chat=None):
+    def rename_topic(self, new_name, topic=None):
         """
         Rename conversation thread for more convenience and future reference
 
         :param new_name: new name
-        :param target_chat: chat to be renamed, by default - current one.
+        :param topic: topic to be renamed, by default - current one.
         :return:
         """
         # check if new name is already taken
         if new_name in self._conversations_history:
             raise RuntimeError(f"Name {new_name} already taken")
-        if target_chat is None:
-            target_chat = self._active_chat
+        if topic is None:
+            topic = self._active_chat
             self._active_chat = new_name
-        self._conversations_history[new_name] = self._conversations_history[target_chat]
-        del self._conversations_history[target_chat]
+        elif topic not in self._conversations_history:
+            raise RuntimeError(f"Topic {topic} not found")
+
+        # update conversation history
+        self._conversations_history[new_name] = self._conversations_history[topic]
+        del self._conversations_history[topic]
+
+        if new_name == self._active_chat:
+            return f"Active topic: {new_name}"
+        else:
+            return f"Renamed {topic} to {new_name}"
 
     @staticmethod
     def calculate_history_depth(history, word_limit):
