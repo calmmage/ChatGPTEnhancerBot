@@ -229,27 +229,63 @@ class ChatBot:
             docstring = func.__doc__
             return docstring
 
-    def switch_model(self, model):
-        """Switch under-the-hood model that ChatGPT uses
+    models_data = {m.id: m for m in openai.Model.list().data}
+
+    def get_models_ids(self):
+        """
+        Get available openai models ids
+        :return: List[str]
+        """
+        return sorted(self.models_data.keys())
+
+    @telegram_commands_registry.register('/list_models')
+    def get_models_ids_command(self):
+        """
+        Get available openai models ids. Pricing: https://openai.com/api/pricing/
+        Play at your own peril - using /switch_model command
+        Mostly old, useless, cheaper versions
         Most notable models:
         'text-davinci-003' - strongest and most expensive
-        Others make pretty mush no sense
-        there w
+        Others make pretty mush no sense for Chat
+        'davinci-instruct' - predecessor for official ChatGPT
+        'codex' - for code generation, model under the hood of Github Copilot
+        Probably only makes sense use /query command if you decide to explore
+        :return: str
+        """
+        #  todo: sort meaningfully, highlight most interesting models first
+        return "\n".join(self.get_models_ids())
+
+    def get_model_info(self, model_id):
+        """
+        Get model info
+        :param model_id: str
+        :return: dict
+        """
+        return self.models_data[model_id]
+
+    @telegram_commands_registry.register('/get_model_info')
+    def get_model_info_command(self, model_id):
+        """
+        Get model info
+        :param model_id: str
+        :return: str
+        """
+        return pprint.pformat(self.get_model_info(model_id))
+
+    def switch_model(self, model):
+        """Switch under-the-hood model that this bot uses
+        Most notable models:
+        'text-davinci-003' - strongest and most expensive
+        Others make pretty mush no sense for Chat
+        'davinci-instruct' - predecessor for official ChatGPT
+        'codex' - for code generation, model under the hood of Github Copilot
+        Probably only makes sense use /query command if you decide to explore
         """
         # check model is valid
-        if model not in self.list_models():
+        if model not in self.models_data:
             raise RuntimeError(f"Model {model} is not in the list")
         self.model = model
-
-    @staticmethod
-    @lru_cache()
-    def list_models():
-        """List available openai models. Play at your own peril - using /switch_model command
-        Mostly old, useless, cheaper versions
-        But also some alternative / experimental ones - most notably codex (for coding) and
-        """
-        models_list = openai.Model.list()  # todo: pretty print
-        return [m.id for m in models_list]
+        return f"Active model: {model}"
 
     def save_traceback(self, msg):
         self._traceback.append(msg)
