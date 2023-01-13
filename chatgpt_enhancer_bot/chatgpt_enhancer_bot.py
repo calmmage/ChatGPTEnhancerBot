@@ -14,6 +14,7 @@ from telegram import Update
 from telegram.error import NetworkError
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
+from chatgpt_enhancer_bot.openai_chatbot import telegram_commands_registry
 from openai_chatbot import ChatBot
 from utils import get_secrets, generate_funny_reason, generate_funny_consolation
 
@@ -153,9 +154,10 @@ def main(expensive: bool) -> None:
                                           # telegram_user_decorator(b.chat, model=model)
                                           ))
 
-    for command, method_name in ChatBot.commands.items():
-        command_handler = make_command_handler(method_name)
-        dispatcher.add_handler(CommandHandler(command.strip('/'), command_handler))
+    for command in telegram_commands_registry.list_commands():
+        function_name = telegram_commands_registry.get_function(command)
+        command_handler = make_command_handler(function_name)
+        dispatcher.add_handler(CommandHandler(command.lstrip('/'), command_handler))
 
     # Add the error handler to the dispatcher
     dispatcher.add_error_handler(error_handler)

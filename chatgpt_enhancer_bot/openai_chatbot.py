@@ -3,11 +3,13 @@ import datetime
 import json
 import logging
 import os.path
-from functools import lru_cache
+import pprint
 
 import openai
 from random_word import RandomWords
 
+from chatgpt_enhancer_bot.chatgpt_enhancer_bot import WELCOME_MESSAGE
+from chatgpt_enhancer_bot.command_registry import CommandRegistry
 from utils import get_secrets
 
 secrets = get_secrets()
@@ -31,6 +33,8 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+telegram_commands_registry = CommandRegistry()
 
 
 class ChatBot:
@@ -77,6 +81,7 @@ class ChatBot:
 
         # todo: rewrite all commands as a separate wrapper methods, starting with _command
     }
+    telegram_commands_registry.update(commands)
 
     def _load_conversations_history(self):
         if os.path.exists(self._conversations_history_path):
