@@ -10,12 +10,10 @@ import time
 import traceback
 from typing import Dict
 
-from telegram import Update
-from telegram.error import NetworkError
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
 
-from chatgpt_enhancer_bot.openai_chatbot import telegram_commands_registry
-from openai_chatbot import ChatBot
+from openai_chatbot import ChatBot, telegram_commands_registry
 from utils import get_secrets, generate_funny_reason, generate_funny_consolation
 
 secrets = get_secrets()
@@ -38,7 +36,7 @@ history_dir = os.path.join(os.path.dirname(__file__), 'history')
 os.makedirs(history_dir, exist_ok=True)
 
 
-def get_bot(user):
+def get_bot(user) -> ChatBot:
     if user not in bots:
         history_path = os.path.join(history_dir, f'history_{user}.json')
         new_bot = ChatBot(conversations_history_path=history_path, model=default_model, user=user)
@@ -54,6 +52,57 @@ def chat(prompt, user):
 def chat_handler(update: Update, context: CallbackContext) -> None:
     response = chat(update.message.text, user=update.effective_user.username)
     update.message.reply_markdown_v2(response)
+
+
+def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
+    menu = [buttons[i:i + n_cols] for i in range(0, len(buttons), n_cols)]
+    if header_buttons:
+        menu.insert(0, header_buttons)
+    if footer_buttons:
+        menu.append(footer_buttons)
+    return menu
+
+
+def send_menu(update, context, menu: dict, message, n_cols=2):
+    button_list = [InlineKeyboardButton(k, callback_data=v) for k, v in menu.items()]
+    reply_markup = InlineKeyboardMarkup(build_menu(button_list, n_cols=n_cols))
+    update.message.reply_text(message, reply_markup=reply_markup)
+
+
+def topics_menu_handler(update: Update, context: CallbackContext) -> None:
+    user = update.effective_user.username
+    bot = get_bot(user)
+    send_menu(update, context, bot.get_topics_menu(), "Choose a topic to switch to:")
+
+
+def button_callback(update, context):
+    prompt = update.callback_query.data
+    user = update.effective_user.username
+    bot = get_bot(user)
+
+    if prompt.startswith('/'):
+        command, qargs, qkwargs = bot.parse_query(prompt)
+        method_name = bot.command_registry.get_function(command)
+        method = getattr(bot, method_name)
+        result = method(*qargs, **qkwargs)
+    else:
+        result = bot.chat(prompt)
+
+    command, qargs, qkwargs = bot.parse_query(prompt)
+    # todo: if necessary args are missing, ask for them or at least handle the exception gracefully
+    if not result:
+        result = f"Command {command} finished successfully"
+    result = clean_markdown(result)
+
+    # # how do I send the message back?
+    #
+    #
+    # bot.send_message(update.effective_message.chat_id, *args, **kwargs)
+    # telegram_bot
+    #
+    #
+    # update
+    update.effective_message.reply_markdown_v2(result)
 
 
 # Enable logging
@@ -119,15 +168,26 @@ def main(expensive: bool) -> None:
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
 
-
     globals()['default_model'] = "text-davinci-003" if expensive else "text-ada:001"
     # on non command i.e message - echo the message on Telegram
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, chat_handler))
 
     for command in telegram_commands_registry.list_commands():
-        function_name = telegram_commands_registry.get_function(command)
-        command_handler = make_command_handler(function_name)
+        match command:
+            case "/get_topics_menu":
+                command_handler = topics_menu_handler
+            case other:
+                function_name = telegram_commands_registry.get_function(command)
+                command_handler = make_command_handler(function_name)
         dispatcher.add_handler(CommandHandler(command.lstrip('/'), command_handler))
+
+    # Add the callback handler to the dispatcher
+    dispatcher.add_handler(CallbackQueryHandler(button_callback))
+
+    # Update commands list
+    commands = [BotCommand(command, telegram_commands_registry.get_description(command)) for command in
+                telegram_commands_registry.list_commands()]
+    dispatcher.bot.set_my_commands(commands)
 
     # Add the error handler to the dispatcher
     dispatcher.add_error_handler(error_handler)
