@@ -99,23 +99,13 @@ class ChatBot:
 
     commands = {
         # todo: group commands by meaning
-        "/help": "help",
-        # todo: register user (/start)
-        # todo:
 
         # Chat management
-        "/new_topic": "start_new_topic",
-        "/topics": "list_topics",
-        "/switch_topic": "switch_topic",
-        "/rename_chat": "rename_chat",
         "/history": "get_history",
         # todo: default = everytime new chat (and sometimes go back), or default = everytime same chat (and sometimes go to threads)
         # todo: map discussions, summary. Group by topic. Depth Navigation.
 
         # model configuration and preset
-        # todo: history tokens limit
-        # todo: temperature
-        # todo: response tokens limit
         "/list_models": "list_models",
         "/switch_model": "switch_model",
         # todo: presets, menu
@@ -156,7 +146,8 @@ class ChatBot:
         self._conversations_history[chat].append((prompt, response_text, timestamp.isoformat()))
         self._save_conversations_history()
 
-    def start_new_topic(self, name=None):
+    @telegram_commands_registry.register('/new_topic')
+    def add_new_topic(self, name=None):
         """
         Start a new conversation thread with clean context. Saves up the token quota.
         :param name: Name for a new chat (don't repeat yourself!)
@@ -174,10 +165,11 @@ class ChatBot:
 
     def _generate_new_topic_name(self):
         # todo: rename chat according to its history - get the syntactic analysis (from chatgpt, some lightweight model)
-        today = datetime.datetime.now().strftime('%y%b%d')
+        today = datetime.datetime.now().strftime('%Y%b%d')
         new_topic_name = f'{today}-{self._session_name}-{self.chat_count}'
         return new_topic_name
 
+    @telegram_commands_registry.register('/topics')
     def list_topics(self, limit=10):
         """ List 10 most recent topics. Use /list_topics 0 to list all topics
 
@@ -186,6 +178,7 @@ class ChatBot:
         """
         return list(self._conversations_history.keys())[-limit:]
 
+    @telegram_commands_registry.register()
     def switch_topic(self, name=None, index=None):
         """
         Switch ChatGPT context to another thread of discussion. Provide name or index of the chat to switch
@@ -208,6 +201,7 @@ class ChatBot:
             return f"Active topic: {name}"  # todo - log instead? And then send logs to user
         raise RuntimeError("Both name and index are missing")
 
+    @telegram_commands_registry.register()
     def rename_topic(self, new_name, topic=None):
         """
         Rename conversation thread for more convenience and future reference
@@ -362,7 +356,7 @@ class ChatBot:
             command, qargs, qkwargs = self.parse_query(prompt)
             if command in self.commands:
                 func = self.__getattribute__(self.commands[command])
-                return func(*qargs, qkwargs)
+                return func(*qargs, **qkwargs)
             else:
                 raise RuntimeError(f"Unknown Command! {prompt}")
             #         # todo: log / reply instead? Telegram bot handler?
