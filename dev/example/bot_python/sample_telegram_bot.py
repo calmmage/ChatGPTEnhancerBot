@@ -14,7 +14,7 @@
 import logging
 from functools import wraps
 
-from telegram import Update, ForceReply
+from telegram import Update, ForceReply, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # Load the secrets from a file
@@ -73,6 +73,42 @@ class TestCommandSource:
             else:
                 args.append(p)
         return command, args, kwargs
+
+
+# todo: add custom handler for this menu command
+#  consider adding this to list_topics command
+#  and to swith_topic command, if there's no args.. - here, definitely no harm.
+
+# the question is how to trigger the menu from inside the bot?
+# def topics_menu(self, )l.,
+
+# let me think abit
+# 1) I can add this to telegram bot. But then it won't know that kwargs are missing. Or can I detect it in command handler?
+# 2) Or I can do this from openai api. But then how do I send the message?
+
+
+def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
+    menu = [buttons[i:i + n_cols] for i in range(0, len(buttons), n_cols)]
+    if header_buttons:
+        menu.insert(0, header_buttons)
+    if footer_buttons:
+        menu.append(footer_buttons)
+    return menu
+
+
+def send_menu(update, context, menu: dict, message, n_cols=2):
+    button_list = [InlineKeyboardButton(k, callback_data=v) for k, v in menu.items()]
+    reply_markup = InlineKeyboardMarkup(build_menu(button_list, n_cols=n_cols))
+    update.message.reply_text(message, reply_markup=reply_markup)
+
+
+def sample_menu_handler(update, context):
+    menu = {
+        'Option 1': 'I am selecting option1',
+        'Option 2': 'I am selecting option2',
+        'Option 3': 'I am selecting option3',
+    }
+    send_menu(update, context, menu, 'Select an option')
 
 
 # def help_command(update: Update, context: CallbackContext) -> None:
@@ -138,6 +174,8 @@ def main(expensive: bool) -> None:
     # on non command i.e message - echo the message on Telegram
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command,
                                           echo))
+
+    dispatcher.add_handler(CommandHandler("sample_menu", sample_menu_handler))
 
     # Start the Bot
     updater.start_polling()
