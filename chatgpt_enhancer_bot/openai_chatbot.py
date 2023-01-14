@@ -38,6 +38,16 @@ logger = logging.getLogger(__name__)
 telegram_commands_registry = CommandRegistry()
 
 
+def try_guess_topic_name(name, candidates):
+    matches = [c for c in candidates if name in c]
+    if len(matches) == 1:
+        return matches[0]
+    matches = [c for c in candidates if name.lower() in c.lower()]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
 class ChatBot:
     DEFAULT_TOPIC_NAME = 'General'
 
@@ -189,12 +199,15 @@ class ChatBot:
         if name is not None:
             if name in self._conversations_history:  # todo: fuzzy matching, especially using our random words
                 self._active_chat = name
-                return f"Switched chat to {name} successfully"  # todo - log instead? And then send logs to user
-            else:
-                try:
-                    index = int(name)
-                except:
-                    raise RuntimeError(f"Missing chat with name {name}")
+                return f"Active topic: {name}"  # todo - log instead? And then send logs to user
+            guess = try_guess_topic_name(name, self._conversations_history.keys())
+            if guess is not None:
+                self._active_chat = guess
+                return f"Active topic: {guess}"
+            try:
+                index = int(name)
+            except:
+                raise RuntimeError(f"Missing chat with name {name}")
         if index is not None:
             name = list(self._conversations_history.keys())[-index]
             self._active_chat = name
