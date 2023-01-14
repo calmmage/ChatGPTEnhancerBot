@@ -85,24 +85,15 @@ def button_callback(update, context):
         method_name = bot.command_registry.get_function(command)
         method = getattr(bot, method_name)
         result = method(*qargs, **qkwargs)
+        if not result:
+            result = f"Command {command} finished successfully"
     else:
         result = bot.chat(prompt)
 
-    command, qargs, qkwargs = bot.parse_query(prompt)
-    # todo: if necessary args are missing, ask for them or at least handle the exception gracefully
-    if not result:
-        result = f"Command {command} finished successfully"
     result = clean_markdown(result)
-
-    # # how do I send the message back?
-    #
-    #
-    # bot.send_message(update.effective_message.chat_id, *args, **kwargs)
-    # telegram_bot
-    #
-    #
-    # update
-    update.effective_message.reply_markdown_v2(result)
+    response_message = update.effective_message.reply_markdown_v2(result)
+    if result.startswith("Active topic"):
+        response_message.pin()
 
 
 # Enable logging
@@ -169,7 +160,9 @@ def make_command_handler(method_name):
         if not result:
             result = f"Command {command} finished successfully"
         result = clean_markdown(result)
-        update.message.reply_markdown_v2(result)
+        response_message = update.effective_message.reply_markdown_v2(result)
+        if result.startswith("Active topic"):
+            response_message.pin()
 
     return command_handler
 
