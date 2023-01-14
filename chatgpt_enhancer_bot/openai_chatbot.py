@@ -62,7 +62,7 @@ def try_guess_topic_name(name, candidates):
     return None
 
 
-class ChatBot:
+class ChatBot:  # todo: rename to OpenAIChatbot
     DEFAULT_TOPIC_NAME = 'General'
 
     def __init__(self, model=None, history_word_limit=HISTORY_WORD_LIMIT,  # history_path=HISTORY_PATH,
@@ -138,12 +138,9 @@ class ChatBot:
     #     # todo: rewrite all commands as a separate wrapper methods, starting with _command
     # }
 
-        # dev
-        "/dev": "get_traceback",
-
-        # todo: rewrite all commands as a separate wrapper methods, starting with _command
-    }
-    telegram_commands_registry.update(commands)
+    @telegram_commands_registry.register()
+    def get_topics_menu(self):
+        return {topic: f"/switch_topic {topic}" for topic in self.list_topics()}
 
     def _load_conversations_history(self):
         if os.path.exists(self._conversations_history_path):
@@ -162,9 +159,21 @@ class ChatBot:
         :param limit: Max messages from history
         :return: List[Tuple(prompt, response)]
         """
-        if chat is None:
-            chat = self._active_chat
-        return self._conversations_history[chat][-limit:]
+        if limit is not None:
+            limit = int(limit)
+        if topic is None:
+            topic = self._active_topic
+        return self._conversations_history[topic][-limit:]
+
+    @telegram_commands_registry.register('/history')
+    def get_history_command(self, topic=None, limit=10):
+        if limit is not None:
+            limit = int(limit)
+        history = self.get_history(topic, limit)
+        return '\n'.join(
+            f"{timestamp}\n"
+            f"[Human]: {prompt}\n[Bot]: {response}"
+            for prompt, response, timestamp in history)
 
     # def get_summary(self):
     # todo: get summary of the conversation from ChatGPT until this point..
@@ -208,6 +217,8 @@ class ChatBot:
         :param limit: Num topics to list. Default - 10. To get all topics - set to 0
         :return:
         """
+        if limit is not None:
+            limit = int(limit)
         return list(self._conversations_history.keys())[-limit:]
 
     @telegram_commands_registry.register()
@@ -408,6 +419,8 @@ class ChatBot:
         """
         # todo: Commands. Extract this into a separate method
         if prompt.startswith('/'):
+            raise NotImplementedError("There was an update to command handling, this part of code is not updated yet")
+            # todo: update, add tests
             command, qargs, qkwargs = self.parse_query(prompt)
             if command in self.commands:
                 func = self.__getattribute__(self.commands[command])
@@ -425,7 +438,10 @@ class ChatBot:
         history_depth = self.calculate_history_depth(full_history, word_limit=self._history_word_limit)
         history = full_history[-history_depth:]
         for i in range(len(history)):
-            augmented_prompt += f"{HUMAN_TOKEN}: {history[i][0]}\n{BOT_TOKEN}: {history[i][1]}\n"
+            prompt, response, timestamp = history[i]
+            # if self._query_config['history_include_timestamp']:
+            # augmented_prompt += f"{timestamp}\n"
+            augmented_prompt += f"{HUMAN_TOKEN}: {prompt}\n{BOT_TOKEN}: {response}\n"
 
         # include the latest prompt
         augmented_prompt += f"{HUMAN_TOKEN}: {prompt}\n"
