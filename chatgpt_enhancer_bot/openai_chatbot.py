@@ -8,8 +8,8 @@ import pprint
 import openai
 from random_word import RandomWords
 
-from chatgpt_enhancer_bot.command_registry import CommandRegistry
-from chatgpt_enhancer_bot.openai_wrapper import DEFAULT_QUERY_CONFIG, query_openai
+from command_registry import CommandRegistry
+from openai_wrapper import DEFAULT_QUERY_CONFIG, query_openai
 from utils import get_secrets
 
 secrets = get_secrets()
@@ -80,7 +80,7 @@ class ChatBot:
         self._traceback = []
 
     @property
-    @telegram_commands_registry.register('model')
+    @telegram_commands_registry.register('/model')
     def active_model(self):
         # todo: figure out how to handle multpile configs
         return self._query_config.model
@@ -92,7 +92,7 @@ class ChatBot:
         self._query_config.temperature = temperature
         return f"Temperature set to {temperature}"
 
-    @telegram_commands_registry.register(['set_max_tokens', 'set_response_length'])
+    @telegram_commands_registry.register(['/set_max_tokens', '/set_response_length'])
     def set_max_tokens(self, max_tokens: int):
         """
         Set max tokens for the response
@@ -107,25 +107,29 @@ class ChatBot:
         self._query_config.update(max_tokens=max_tokens)
         return f"Response max tokens length set to {max_tokens}"
 
-    @telegram_commands_registry.register(['set_history_depth', 'set_history_word_limit'])
+    @telegram_commands_registry.register(['/set_history_depth', '/set_history_word_limit'])
     def set_history_word_limit(self, limit: int):
         if limit > MAX_HISTORY_WORD_LIMIT - self._query_config.max_tokens:
             raise ValueError(f"Limit must be less than {MAX_HISTORY_WORD_LIMIT}")
         self._history_word_limit = limit
         return f"History word limit set to {limit}"
 
-    commands = {
-        # todo: group commands by meaning
+    @property
+    def command_registry(self):
+        return telegram_commands_registry
 
-        # Chat management
-        "/history": "get_history",
-        # todo: default = everytime new chat (and sometimes go back), or default = everytime same chat (and sometimes go to threads)
-        # todo: map discussions, summary. Group by topic. Depth Navigation.
-
-        # model configuration and preset
-        "/list_models": "list_models",
-        "/switch_model": "switch_model",
-        # todo: presets, menu
+    # commands = {
+    #     # todo: group commands by meaning
+    #
+    #     # Chat management
+    #     # todo: default = everytime new chat (and sometimes go back), or default = everytime same chat (and sometimes go to threads)
+    #     # todo: map discussions, summary. Group by topic. Depth Navigation.
+    #
+    #     # model configuration and preset
+    #     # todo: presets, menu
+    #
+    #     # todo: rewrite all commands as a separate wrapper methods, starting with _command
+    # }
 
         # dev
         "/dev": "get_traceback",
@@ -289,21 +293,14 @@ class ChatBot:
         """Auto-generated from docstrings. Use /help {command} for full docstrings
         *CONGRATULATIONS* You used /help help!!
         """
-
         if command is None:
             help_message = "Available commands:\n"
-            for command in self.commands:
-                func_name = self.commands[command]
-                func = self.__getattribute__(func_name)
-                docstring = func.__doc__ or "This docstring is missing!! Abuse @petr_lavrov until he writes it!!"
-                first_line = docstring.strip().split('\n')[0]
-                help_message += f'{command}: {first_line}\n'
+            for command in self.command_registry.list_commands():
+                func_name = self.command_registry.get_function(command)
+                help_message += f'{command}: {self.command_registry.get_description(command)}\n'
             return help_message
         else:
-            func_name = self.commands[command]
-            func = self.__getattribute__(func_name)
-            docstring = func.__doc__
-            return docstring
+            return self.command_registry.get_docstring(command)
 
     models_data = {m.id: m for m in openai.Model.list().data}
 
@@ -348,6 +345,7 @@ class ChatBot:
         """
         return pprint.pformat(self.get_model_info(model_id))
 
+    @telegram_commands_registry.register()
     def switch_model(self, model):
         """Switch under-the-hood model that this bot uses
         Most notable models:
