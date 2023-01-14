@@ -109,34 +109,52 @@ def button_callback(update, context):
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 
-# Define the error handler function
 def error_handler(update: Update, context: CallbackContext):
-    if isinstance(context.error, NetworkError):
-        # Do something when the "Bad Gateway" error occurs
-        logger.info('NetworkError occurred')
-        time.sleep(1)
+    # step 1: Save the error, so that /dev command can show it
+    # What I want to save: timestamp, error, traceback, prompt
+    user = update.effective_user.username
+    bot = get_bot(user)
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    prompt = None
+    if update.message:
+        prompt = update.message.text
+    elif update.callback_query:
+        prompt = update.callback_query.data
+    bot.save_error(timestamp=timestamp, error=context.error, traceback=traceback.format_exc(),
+                   message_text=prompt)
+    # todo: make save_error also save error to file somewhere
+    logger.warning(traceback.format_exc())
 
-    else:
-        # todo: send error to admin - petrlavrov
-        # for now: just log
-        logger.warning(traceback.format_exc())
+    # # step 1.5: todo, retry after 1 second
+    # time.sleep(1)
+    # prompt = update.message.text
+    # try:
+    #     # todo: retrying the 'new_chat' command is stupid
+    #     # do I need to process the commands differently? I have a special parser inside chat() method.. should be ok
+    #     chat(prompt, user)
+    # except Exception as e:
+    #     bot = get_bot(user)
+    #     bot.save_traceback(traceback.format_exc())
+    #     update.message.reply_text(f"Nah, it's hopeless.. {generate_funny_consolation().lower()}")
 
+    # step 2: Send a funny reason to the user, (but also an error message)
     # Give user the info? Naah, let's rather joke around
     funny_reason = generate_funny_reason().lower()
-    update.message.reply_text(
-        f"Sorry, {funny_reason}. You can use /dev command to see the traceback.. For now - Retrying")
-    # todo: create a /dev command to get the traceback
-    prompt = update.message.text
-    user = update.effective_user.username
-    try:
-        # todo: retrying the 'new_chat' command is stupid
-        # do I need to process the commands differently? I have a special parser inside chat() method.. should be ok
-        time.sleep(5)  # give it some time...
-        chat(prompt, user)
-    except Exception as e:
-        bot = get_bot(user)
-        bot.save_traceback(traceback.format_exc())
-        update.message.reply_text(f"Nah, it's hopeless.. {generate_funny_consolation().lower()}")
+    funny_consolation = generate_funny_consolation().lower()
+    error_message = f"""Sorry, seems {funny_reason}. 
+There was an error: {context.error}. 
+You can use /dev command to see the traceback.. or bump @petr_lavrov about it
+Please, accept my sincere apologies. And.. {funny_consolation}.
+If the error persists, you can also try /new_chat command to start a new conversation.
+"""
+    update.message.reply_text(error_message)
+
+
+def clean_markdown(msg: str):
+    chars = '()[]_~<>#+-=|{}.!'
+    for c in chars:
+        msg = msg.replace(c, '\\' + c)
+    return msg
 
 
 def make_command_handler(method_name):
@@ -150,6 +168,7 @@ def make_command_handler(method_name):
         result = method(*qargs, **qkwargs)  # todo: parse kwargs from the command
         if not result:
             result = f"Command {command} finished successfully"
+        result = clean_markdown(result)
         update.message.reply_markdown_v2(result)
 
     return command_handler
