@@ -76,11 +76,11 @@ class ChatBot:
         if model is not None:
             self._query_config.model = model
 
-        self.chat_count = 0
+        self.topic_count = 0
         self._session_name = RW.get_random_word()  # random-word
         self._history_word_limit = history_word_limit
 
-        self._active_chat = self.DEFAULT_TOPIC_NAME
+        self._active_topic = self.DEFAULT_TOPIC_NAME
         self._conversations_history_path = conversations_history_path
         self._conversations_history = self._load_conversations_history()  # attempt to make 'new chat' a thing
         # self._start_new_topic()
@@ -155,10 +155,10 @@ class ChatBot:
         json.dump(self._conversations_history, open(self._conversations_history_path, 'w'), indent=' ')
         # todo: Implement saving to database
 
-    def get_history(self, chat=None, limit=10):
+    def get_history(self, topic=None, limit=10):
         """
-        Get conversation history for a particular chat
-        :param chat: what context/thread to use. By default - current
+        Get conversation history for a particular topic
+        :param topic: what context/thread to use. By default - current
         :param limit: Max messages from history
         :return: List[Tuple(prompt, response)]
         """
@@ -166,35 +166,39 @@ class ChatBot:
             chat = self._active_chat
         return self._conversations_history[chat][-limit:]
 
-    def _record_history(self, prompt, response_text, chat=None):  # todo: save to proper database
-        if chat is None:
-            chat = self._active_chat
+    # def get_summary(self):
+    # todo: get summary of the conversation from ChatGPT until this point..
+
+    def _record_history(self, prompt, response_text, topic=None):  # todo: save to proper database
+        if topic is None:
+            topic = self._active_topic
 
         timestamp = datetime.datetime.now()
-        self._conversations_history[chat].append((prompt, response_text, timestamp.isoformat()))
+        self._conversations_history[topic].append((prompt, response_text, timestamp.isoformat()))
         self._save_conversations_history()
 
     @telegram_commands_registry.register('/new_topic')
     def add_new_topic(self, name=None):
         """
         Start a new conversation thread with clean context. Saves up the token quota.
-        :param name: Name for a new chat (don't repeat yourself!)
+        :param name: Name for a new topic (don't repeat yourself!)
         :return:
         """
         if name is None:
             name = self._generate_new_topic_name()
         if name in self._conversations_history:
             # todo: process properly? Switch instead?
-            raise RuntimeError("Chat already exists")
-        self._active_chat = name
-        self._conversations_history[self._active_chat] = []
-        self.chat_count += 1
-        # todo: name a chat accordingly, after a few messages
+            raise RuntimeError("Topic already exists")
+        self._active_topic = name
+        self._conversations_history[self._active_topic] = []
+        self.topic_count += 1
+        # todo: name a topic accordingly, after a few messages
 
     def _generate_new_topic_name(self):
-        # todo: rename chat according to its history - get the syntactic analysis (from chatgpt, some lightweight model)
+        # todo: rename topic according to its history - get the syntactic analysis
+        #  (from chatgpt, some lightweight model)
         today = datetime.datetime.now().strftime('%Y%b%d')
-        new_topic_name = f'{today}-{self._session_name}-{self.chat_count}'
+        new_topic_name = f'{today}-{self._session_name}-{self.topic_count}'
         return new_topic_name
 
     @telegram_commands_registry.register('/topics')
@@ -216,19 +220,19 @@ class ChatBot:
         """
         if name is not None:
             if name in self._conversations_history:  # todo: fuzzy matching, especially using our random words
-                self._active_chat = name
+                self._active_topic = name
                 return f"Active topic: {name}"  # todo - log instead? And then send logs to user
             guess = try_guess_topic_name(name, self._conversations_history.keys())
             if guess is not None:
-                self._active_chat = guess
+                self._active_topic = guess
                 return f"Active topic: {guess}"
             try:
                 index = int(name)
             except:
-                raise RuntimeError(f"Missing chat with name {name}")
+                raise RuntimeError(f"Missing topic with name {name}")
         if index is not None:
             name = list(self._conversations_history.keys())[-index]
-            self._active_chat = name
+            self._active_topic = name
             return f"Active topic: {name}"  # todo - log instead? And then send logs to user
         raise RuntimeError("Both name and index are missing")
 
@@ -245,8 +249,8 @@ class ChatBot:
         if new_name in self._conversations_history:
             raise RuntimeError(f"Name {new_name} already taken")
         if topic is None:
-            topic = self._active_chat
-            self._active_chat = new_name
+            topic = self._active_topic
+            self._active_topic = new_name
         elif topic not in self._conversations_history:
             raise RuntimeError(f"Topic {topic} not found")
 
@@ -254,7 +258,7 @@ class ChatBot:
         self._conversations_history[new_name] = self._conversations_history[topic]
         del self._conversations_history[topic]
 
-        if new_name == self._active_chat:
+        if new_name == self._active_topic:
             return f"Active topic: {new_name}"
         else:
             return f"Renamed {topic} to {new_name}"
