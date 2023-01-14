@@ -27,32 +27,8 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-WELCOME_MESSAGE = """This is an alpha version of the Petr Lavrov's ChatGPT enhancer.
-This message is last updated on 03.01.2023. Please ping t.me/petr_lavrov if I forgot to update it :)
-Please play around, but don't abuse too much. I run this for my own money... It's ok if you send ~100 messages
-"""
-
 TOUCH_FILE_PATH = os.path.expanduser('~/heartbeat/chatgpt_enhancer_last_alive')
 os.makedirs(os.path.dirname(TOUCH_FILE_PATH), exist_ok=True)
-
-
-# Define a few command handlers. These usually take the two arguments update and
-# context.
-def start(update: Update, context: CallbackContext) -> None:
-    """Send a message when the command /start is issued."""
-    user = update.effective_user
-    welcome_message = f'Hi {user.username}!\n'
-    welcome_message += WELCOME_MESSAGE
-    update.message.reply_text(
-        welcome_message,
-        # reply_markup=ForceReply(selective=True),
-    )
-
-
-# def help_command(update: Update, context: CallbackContext) -> None:
-#     """Send a message when the command /help is issued."""
-#     update.message.reply_text('Help!')
-
 
 bots = {}  # type: Dict[str, ChatBot]
 
@@ -143,11 +119,7 @@ def main(expensive: bool) -> None:
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
 
-    # on different commands - answer in Telegram
-    dispatcher.add_handler(CommandHandler("start", start))
-    # dispatcher.add_handler(CommandHandler("help", help_command))
 
-    # b = ChatBot()
     globals()['default_model'] = "text-davinci-003" if expensive else "text-ada:001"
     # on non command i.e message - echo the message on Telegram
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, chat_handler

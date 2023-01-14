@@ -8,8 +8,8 @@ import pprint
 import openai
 from random_word import RandomWords
 
-from chatgpt_enhancer_bot.chatgpt_enhancer_bot import WELCOME_MESSAGE
 from chatgpt_enhancer_bot.command_registry import CommandRegistry
+from chatgpt_enhancer_bot.openai_wrapper import DEFAULT_QUERY_CONFIG, query_openai
 from utils import get_secrets
 
 secrets = get_secrets()
@@ -22,6 +22,12 @@ HISTORY_WORD_LIMIT = 1000
 CHATBOT_INTRO_MESSAGE = "The following is a conversation with an AI assistant [Bot]. " \
                         "The assistant is helpful, creative, clever, and very friendly. " \
                         "The bot was created by OpenAI team and enhanced by Petr Lavrov \n"
+
+WELCOME_MESSAGE = """This is an alpha version of the Petr Lavrov's ChatGPT enhancer.
+This message is last updated on 03.01.2023. Please ping t.me/petr_lavrov if I forgot to update it :)
+Please play around, but don't abuse too much. I run this for my own money... It's ok if you send ~100 messages
+"""
+
 RW = RandomWords()
 
 HUMAN_TOKEN = '[HUMAN]'
@@ -269,6 +275,15 @@ class ChatBot:
                 args.append(p)
         return command, args, kwargs
 
+    @telegram_commands_registry.register('/start')
+    def start(self):
+        """Send a message when the command /start is issued, initiate the bot"""
+        # todo: register user - once the User data model is ready and database is set up
+        # user = update.effective_user
+        # welcome_message = f'Hi {user.username}!\n'
+        return WELCOME_MESSAGE
+
+    @telegram_commands_registry.register('/help')
     def help(self, command=None):
         """Auto-generated from docstrings. Use /help {command} for full docstrings
         *CONGRATULATIONS* You used /help help!!
