@@ -19,9 +19,12 @@ openai.api_key = secrets["openai_api_key"]
 CONVERSATIONS_HISTORY_PATH = 'conversations_history.json'
 HISTORY_WORD_LIMIT = 1000
 
-CHATBOT_INTRO_MESSAGE = "The following is a conversation with an AI assistant [Bot]. " \
+HUMAN_TOKEN = '[H]'
+BOT_TOKEN = '[B]'
+CHATBOT_INTRO_MESSAGE = f"The following is a conversation of human {HUMAN_TOKEN} with an AI assistant {BOT_TOKEN}. " \
                         "The assistant is helpful, creative, clever, and very friendly. " \
-                        "The bot was created by OpenAI team and enhanced by Petr Lavrov \n"
+                        "All code must be in ```{lang} code ```. " \
+                        "The bot was created by OpenAI team and enhanced by Petr Lavrov. \n"
 
 WELCOME_MESSAGE = """This is an alpha version of the Petr Lavrov's ChatGPT enhancer.
 This message is last updated on 03.01.2023. Please ping t.me/petr_lavrov if I forgot to update it :)
@@ -30,8 +33,6 @@ Please play around, but don't abuse too much. I run this for my own money... It'
 
 RW = RandomWords()
 
-HUMAN_TOKEN = '[HUMAN]'
-BOT_TOKEN = '[BOT]'
 MAX_HISTORY_WORD_LIMIT = 4096
 
 # Enable logging

@@ -53,7 +53,7 @@ def chat(prompt, user):
 
 def chat_handler(update: Update, context: CallbackContext) -> None:
     response = chat(update.message.text, user=update.effective_user.username)
-    update.message.reply_text(response)
+    update.message.reply_markdown_v2(response)
 
 
 # Enable logging
@@ -101,7 +101,7 @@ def make_command_handler(method_name):
         result = method(*qargs, **qkwargs)  # todo: parse kwargs from the command
         if not result:
             result = f"Command {command} finished successfully"
-        update.message.reply_text(result)
+        update.message.reply_markdown_v2(result)
 
     return command_handler
 
@@ -122,9 +122,7 @@ def main(expensive: bool) -> None:
 
     globals()['default_model'] = "text-davinci-003" if expensive else "text-ada:001"
     # on non command i.e message - echo the message on Telegram
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, chat_handler
-                                          # telegram_user_decorator(b.chat, model=model)
-                                          ))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, chat_handler))
 
     for command in telegram_commands_registry.list_commands():
         function_name = telegram_commands_registry.get_function(command)
