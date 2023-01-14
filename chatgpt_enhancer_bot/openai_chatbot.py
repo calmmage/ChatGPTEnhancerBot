@@ -31,6 +31,13 @@ This message is last updated on 03.01.2023. Please ping t.me/petr_lavrov if I fo
 Please play around, but don't abuse too much. I run this for my own money... It's ok if you send ~100 messages
 """
 
+ERROR_MESSAGE_TEMPLATE = """
+Error: *{error}*
+*Timestamp:* {timestamp}
+*Original message:* {message_text}
+*Traceback:* {traceback}
+"""
+
 RW = RandomWords()
 
 MAX_HISTORY_WORD_LIMIT = 4096
@@ -361,11 +368,28 @@ class ChatBot:
         self.model = model
         return f"Active model: {model}"
 
-    def save_traceback(self, msg):
-        self._traceback.append(msg)
+    def save_error(self, timestamp, error, traceback, message_text):
+        self._traceback.append((timestamp, error, traceback, message_text))
 
-    def get_traceback(self, limit=1):
+    def get_errors(self, limit=1):
+        if limit is not None:
+            limit = int(limit)
         return self._traceback[-limit:]
+
+    @telegram_commands_registry.register(['/error', '/errors', '/dev', '/describe_error'])
+    def describe_errors(self, limit=1):
+        if limit is not None:
+            limit = int(limit)
+        errors = self.get_errors(limit)
+        res = []
+        for timestamp, error, traceback, message_text in errors:
+            res.append(ERROR_MESSAGE_TEMPLATE.format(
+                error=error,
+                timestamp=timestamp,
+                message_text=message_text,
+                traceback=traceback
+            ))
+        return '\n'.join(res)
 
     # ------------------------------
     # Main chat method
