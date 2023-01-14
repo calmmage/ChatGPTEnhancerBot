@@ -381,7 +381,7 @@ class ChatBot:
         # Extract the response from the API response
         response_text = response_text.strip()
         if response_text.startswith(BOT_TOKEN):
-            response_text = response_text[len(BOT_TOKEN) + 2:]
+            response_text = response_text[len(BOT_TOKEN) + 1:]
 
         # Update the conversation history
         self._record_history(prompt, response_text)
