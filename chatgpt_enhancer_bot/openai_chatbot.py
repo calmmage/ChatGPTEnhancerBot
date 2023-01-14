@@ -26,6 +26,7 @@ RW = RandomWords()
 
 HUMAN_TOKEN = '[HUMAN]'
 BOT_TOKEN = '[BOT]'
+MAX_HISTORY_WORD_LIMIT = 4096
 
 # Enable logging
 logging.basicConfig(
@@ -40,9 +41,17 @@ telegram_commands_registry = CommandRegistry()
 class ChatBot:
     DEFAULT_TOPIC_NAME = 'General'
 
-    def __init__(self, model="text-ada:001", history_word_limit=HISTORY_WORD_LIMIT,  # history_path=HISTORY_PATH,
-                 conversations_history_path=CONVERSATIONS_HISTORY_PATH):
-        self.model = model
+    def __init__(self, model=None, history_word_limit=HISTORY_WORD_LIMIT,  # history_path=HISTORY_PATH,
+                 conversations_history_path=CONVERSATIONS_HISTORY_PATH, query_config=DEFAULT_QUERY_CONFIG, user=None,
+                 **kwargs):
+        # set up query config
+        self._query_config = query_config
+        self._query_config.update(**kwargs)
+        if user is not None:
+            self._query_config.user = user
+        if model is not None:
+            self._query_config.model = model
+
         self.chat_count = 0
         self._session_name = RW.get_random_word()  # random-word
         self._history_word_limit = history_word_limit
@@ -52,6 +61,41 @@ class ChatBot:
         self._conversations_history = self._load_conversations_history()  # attempt to make 'new chat' a thing
         # self._start_new_topic()
         self._traceback = []
+
+    @property
+    @telegram_commands_registry.register('model')
+    def active_model(self):
+        # todo: figure out how to handle multpile configs
+        return self._query_config.model
+
+    @telegram_commands_registry.register()
+    def set_temperature(self, temperature: float):
+        if not 0 <= temperature <= 1:
+            raise ValueError("Temperature must be in [0, 1]")
+        self._query_config.temperature = temperature
+        return f"Temperature set to {temperature}"
+
+    @telegram_commands_registry.register(['set_max_tokens', 'set_response_length'])
+    def set_max_tokens(self, max_tokens: int):
+        """
+        Set max tokens for the response
+        Total number of tokens (including prompt) should not exceed the limit for the model - 4096 for text-davinci
+        :param max_tokens:
+        :return:
+        """
+        model_token_limit = self.get_model_info(self.active_model)['max_tokens']
+        if max_tokens > model_token_limit - self._history_word_limit:
+            raise ValueError(
+                f"Max tokens combined with history word limit ({self._history_word_limit}) should not exceed {model_token_limit}")
+        self._query_config.update(max_tokens=max_tokens)
+        return f"Response max tokens length set to {max_tokens}"
+
+    @telegram_commands_registry.register(['set_history_depth', 'set_history_word_limit'])
+    def set_history_word_limit(self, limit: int):
+        if limit > MAX_HISTORY_WORD_LIMIT - self._query_config.max_tokens:
+            raise ValueError(f"Limit must be less than {MAX_HISTORY_WORD_LIMIT}")
+        self._history_word_limit = limit
+        return f"History word limit set to {limit}"
 
     commands = {
         # todo: group commands by meaning
@@ -305,16 +349,11 @@ class ChatBot:
     # ------------------------------
     # Main chat method
 
-    def chat(self, prompt, model=None, max_tokens=512,
-             # temperature=0.5, top_p=1, n=1, stream=False, stop="\n",
-             **kwargs):
+    def chat(self, prompt, **kwargs):
         """
         https://beta.openai.com/docs/api-reference/completions/create
 
         :param prompt:
-        :param model: For testing purposes - cheap - 'text-ada:001'. For real purposes - "text-davinci-003" - expensive!
-        :param temperature: 0-1
-        :param max_tokens: 16-4096
         :param kwargs:
         :return:
         """
@@ -343,17 +382,10 @@ class ChatBot:
         augmented_prompt += f"{HUMAN_TOKEN}: {prompt}\n"
         logger.debug(augmented_prompt)  # print(augmented_prompt)
 
-        # Send the message to the OpenAI API
-        if model is None:
-            model = self.model
-        response = openai.Completion.create(model=model, prompt=augmented_prompt, max_tokens=max_tokens
-                                            # todo: pass hash of user
-                                            # , temperature=temperature,
-                                            # top_p=top_p, n=n, stream=stream, stop=stop
-                                            , **kwargs)
+        response_text = query_openai(augmented_prompt, self._query_config, **kwargs)  # todo: pass hash of user
 
         # Extract the response from the API response
-        response_text = response['choices'][0]['text'].strip()
+        response_text = response_text.strip()
         if response_text.startswith(BOT_TOKEN):
             response_text = response_text[len(BOT_TOKEN) + 2:]
 

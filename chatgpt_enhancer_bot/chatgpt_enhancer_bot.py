@@ -65,7 +65,7 @@ os.makedirs(history_dir, exist_ok=True)
 def get_bot(user):
     if user not in bots:
         history_path = os.path.join(history_dir, f'history_{user}.json')
-        new_bot = ChatBot(conversations_history_path=history_path, model=default_model)
+        new_bot = ChatBot(conversations_history_path=history_path, model=default_model, user=user)
         bots[user] = new_bot
     return bots[user]
 
