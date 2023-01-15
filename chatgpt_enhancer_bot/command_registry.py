@@ -44,7 +44,9 @@ class CommandRegistry:
             self.functions[shortcut] = command
             self.descriptions[shortcut] = desc
             self.docstrings[shortcut] = docstring
-            self.groups[command] = group
+            self.groups[shortcut] = group
+
+        # todo: add command as a separate object as well - avoid duplication in help command. Dataclass?
 
     def update(self, commands):
         self.functions.update(commands)

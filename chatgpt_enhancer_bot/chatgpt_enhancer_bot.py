@@ -157,6 +157,7 @@ def make_command_handler(method_name):
 
         prompt = update.message.text
         command, qargs, qkwargs = bot.parse_query(prompt)
+        # todo: if necessary args are missing, ask for them or at least handle the exception gracefully
         result = method(*qargs, **qkwargs)  # todo: parse kwargs from the command
         if not result:
             result = f"Command {command} finished successfully"
