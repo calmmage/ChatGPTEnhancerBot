@@ -461,10 +461,10 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         history_depth = self.calculate_history_depth(full_history, word_limit=self._history_word_limit)
         history = full_history[-history_depth:]
         for i in range(len(history)):
-            prompt, response, timestamp = history[i]
+            past_prompt, past_response, timestamp = history[i]
             # if self._query_config['history_include_timestamp']:
             # augmented_prompt += f"{timestamp}\n"
-            augmented_prompt += f"{HUMAN_TOKEN}: {prompt}\n{BOT_TOKEN}: {response}\n"
+            augmented_prompt += f"{HUMAN_TOKEN}: {past_prompt}\n{BOT_TOKEN}: {past_response}\n"
 
         # include the latest prompt
         augmented_prompt += f"{HUMAN_TOKEN}: {prompt}\n"
