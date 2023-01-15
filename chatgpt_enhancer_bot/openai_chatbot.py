@@ -95,6 +95,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
 
     @telegram_commands_registry.register(group='configs')
     def set_temperature(self, temperature: float):
+        """ Set temperature for the model """
         if not 0 <= temperature <= 1:
             raise ValueError("Temperature must be in [0, 1]")
         self._query_config.temperature = temperature
@@ -117,6 +118,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
 
     @telegram_commands_registry.register(['/set_history_depth', '/set_history_word_limit'], group='configs')
     def set_history_word_limit(self, limit: int):
+        """Set history word limit - how many words to include for chatbot for context"""
         if limit > MAX_HISTORY_WORD_LIMIT - self._query_config.max_tokens:
             raise ValueError(f"Limit must be less than {MAX_HISTORY_WORD_LIMIT}")
         self._history_word_limit = limit
@@ -141,6 +143,11 @@ class ChatBot:  # todo: rename to OpenAIChatbot
 
     @telegram_commands_registry.register('/topics_menu', group='topics')
     def get_topics_menu(self):
+        """
+        Display topics menu with most recent topics
+        :return:
+        """
+        # todo: pass max topics number, adapt rows number. Get most recent topics
         return {f"*{topic}*" if topic == self._active_topic else topic: f"/switch_topic {topic}" for topic in
                 self.list_topics()}
 
@@ -169,9 +176,17 @@ class ChatBot:  # todo: rename to OpenAIChatbot
 
     @telegram_commands_registry.register('/history', group='topics')
     def get_history_command(self, topic=None, limit=10):
+        """
+        Get conversation history for a particular topic. Use limit=5 if getting 'message too long' error
+        Or ping @petr_lavrov to add pagination or buffer
+        :param topic:
+        :param limit: messages to include
+        :return:
+        """
         if limit is not None:
             limit = int(limit)
         history = self.get_history(topic, limit)
+        # todo: figure out telegram message lenght limit - split into multiple messages
         return '\n'.join(
             f"{timestamp}\n"
             f"[Human]: {prompt}\n[Bot]: {response}"
@@ -225,6 +240,9 @@ class ChatBot:  # todo: rename to OpenAIChatbot
 
     @telegram_commands_registry.register(['/topics', '/t'], group='topics')
     def list_topics_command(self, limit=10):
+        """
+        List 10 most recent topics. Use /list_topics 0 to list all topics
+        """
         return '\n'.join(f"*{t}*" if t == self._active_topic else t for t in self.list_topics(limit))
 
     @telegram_commands_registry.register(['/switch_topic', '/st'], group='topics')
@@ -291,21 +309,36 @@ class ChatBot:  # todo: rename to OpenAIChatbot
 
     @staticmethod
     def parse_query(query):
-        """format: "/command arg1 arg2 key3=arg3" """
-        parts = query.strip().split()
-        if parts[0].startswith('/'):
-            command = parts[0]
-            parts = parts[1:]
-        else:
-            raise RuntimeError(f"command not included? {query}")
+        """format: "/command arg text key1=arg1 key2=arg2" """
         args = []
         kwargs = {}
-        for p in parts:
-            if '=' in p:
-                k, v = p.split('=')
-                kwargs[k] = v
-            else:
-                args.append(p)
+        query = query.strip()
+
+        if query.startswith('/'):
+            if ' ' not in query:
+                return query, args, kwargs
+            command, query = query.split(' ', 1)
+        else:
+            raise RuntimeError(f"command not included? {query}")
+
+        if '=' not in query:
+            return command, [query], kwargs
+
+        parts = query.strip().split('=')
+
+        # parse arg
+        arg, key = parts[0].rsplit(' ', 1)
+        arg = arg.strip()
+        if arg:
+            args.append(arg)
+
+        # parse kwargs
+        for part in parts[1:-1]:
+            value, next_key = part.rsplit(' ', 1)
+            kwargs[key] = value.strip()
+            key = next_key
+        kwargs[key] = parts[-1].strip()
+
         return command, args, kwargs
 
     @telegram_commands_registry.register('/start', group='basic')
