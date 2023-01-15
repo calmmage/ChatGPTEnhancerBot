@@ -87,19 +87,20 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._traceback = []
 
     @property
-    @telegram_commands_registry.register('/model')
+    @telegram_commands_registry.register('/model', group='models')
     def active_model(self):
+        """ Get active model """
         # todo: figure out how to handle multpile configs
         return self._query_config.model
 
-    @telegram_commands_registry.register()
+    @telegram_commands_registry.register(group='configs')
     def set_temperature(self, temperature: float):
         if not 0 <= temperature <= 1:
             raise ValueError("Temperature must be in [0, 1]")
         self._query_config.temperature = temperature
         return f"Temperature set to {temperature}"
 
-    @telegram_commands_registry.register(['/set_max_tokens', '/set_response_length'])
+    @telegram_commands_registry.register(['/set_max_tokens', '/set_response_length'], group='configs')
     def set_max_tokens(self, max_tokens: int):
         """
         Set max tokens for the response
@@ -114,7 +115,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._query_config.update(max_tokens=max_tokens)
         return f"Response max tokens length set to {max_tokens}"
 
-    @telegram_commands_registry.register(['/set_history_depth', '/set_history_word_limit'])
+    @telegram_commands_registry.register(['/set_history_depth', '/set_history_word_limit'], group='configs')
     def set_history_word_limit(self, limit: int):
         if limit > MAX_HISTORY_WORD_LIMIT - self._query_config.max_tokens:
             raise ValueError(f"Limit must be less than {MAX_HISTORY_WORD_LIMIT}")
@@ -138,9 +139,10 @@ class ChatBot:  # todo: rename to OpenAIChatbot
     #     # todo: rewrite all commands as a separate wrapper methods, starting with _command
     # }
 
-    @telegram_commands_registry.register()
+    @telegram_commands_registry.register('/topics_menu', group='topics')
     def get_topics_menu(self):
-        return {topic: f"/switch_topic {topic}" for topic in self.list_topics()}
+        return {f"*{topic}*" if topic == self._active_topic else topic: f"/switch_topic {topic}" for topic in
+                self.list_topics()}
 
     def _load_conversations_history(self):
         if os.path.exists(self._conversations_history_path):
@@ -165,7 +167,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
             topic = self._active_topic
         return self._conversations_history[topic][-limit:]
 
-    @telegram_commands_registry.register('/history')
+    @telegram_commands_registry.register('/history', group='topics')
     def get_history_command(self, topic=None, limit=10):
         if limit is not None:
             limit = int(limit)
@@ -186,7 +188,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._conversations_history[topic].append((prompt, response_text, timestamp.isoformat()))
         self._save_conversations_history()
 
-    @telegram_commands_registry.register('/new_topic')
+    @telegram_commands_registry.register('/new_topic', group='topics')
     def add_new_topic(self, name=None):
         """
         Start a new conversation thread with clean context. Saves up the token quota.
@@ -202,6 +204,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._conversations_history[self._active_topic] = []
         self.topic_count += 1
         # todo: name a topic accordingly, after a few messages
+        return f"Active topic: *{self._active_topic}*"
 
     def _generate_new_topic_name(self):
         # todo: rename topic according to its history - get the syntactic analysis
@@ -210,7 +213,6 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         new_topic_name = f'{today}-{self._session_name}-{self.topic_count}'
         return new_topic_name
 
-    @telegram_commands_registry.register('/topics')
     def list_topics(self, limit=10):
         """ List 10 most recent topics. Use /list_topics 0 to list all topics
 
@@ -221,7 +223,11 @@ class ChatBot:  # todo: rename to OpenAIChatbot
             limit = int(limit)
         return list(self._conversations_history.keys())[-limit:]
 
-    @telegram_commands_registry.register()
+    @telegram_commands_registry.register(['/topics', '/t'], group='topics')
+    def list_topics_command(self, limit=10):
+        return '\n'.join(f"*{t}*" if t == self._active_topic else t for t in self.list_topics(limit))
+
+    @telegram_commands_registry.register(['/switch_topic', '/st'], group='topics')
     def switch_topic(self, name=None, index=None):
         """
         Switch ChatGPT context to another thread of discussion. Provide name or index of the chat to switch
@@ -247,7 +253,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
             return f"Active topic: {name}"  # todo - log instead? And then send logs to user
         raise RuntimeError("Both name and index are missing")
 
-    @telegram_commands_registry.register()
+    @telegram_commands_registry.register(group='topics')
     def rename_topic(self, new_name, topic=None):
         """
         Rename conversation thread for more convenience and future reference
@@ -302,7 +308,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
                 args.append(p)
         return command, args, kwargs
 
-    @telegram_commands_registry.register('/start')
+    @telegram_commands_registry.register('/start', group='basic')
     def start(self):
         """Send a message when the command /start is issued, initiate the bot"""
         # todo: register user - once the User data model is ready and database is set up
@@ -310,7 +316,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         # welcome_message = f'Hi {user.username}!\n'
         return WELCOME_MESSAGE
 
-    @telegram_commands_registry.register('/help')
+    @telegram_commands_registry.register('/help', group='basic')
     def help(self, command=None):
         """Auto-generated from docstrings. Use /help {command} for full docstrings
         *CONGRATULATIONS* You used /help help!!
@@ -333,7 +339,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         """
         return sorted(self.models_data.keys())
 
-    @telegram_commands_registry.register('/list_models')
+    @telegram_commands_registry.register('/list_models', group='models')
     def get_models_ids_command(self):
         """
         Get available openai models ids. Pricing: https://openai.com/api/pricing/
@@ -358,7 +364,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         """
         return self.models_data[model_id]
 
-    @telegram_commands_registry.register('/get_model_info')
+    @telegram_commands_registry.register('/get_model_info', group='models')
     def get_model_info_command(self, model_id):
         """
         Get model info
@@ -367,8 +373,8 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         """
         return pprint.pformat(self.get_model_info(model_id))
 
-    @telegram_commands_registry.register()
-    def switch_model(self, model):
+    @telegram_commands_registry.register(group='models')
+    def switch_model(self, model=None):
         """Switch under-the-hood model that this bot uses
         Most notable models:
         'text-davinci-003' - strongest and most expensive
@@ -378,9 +384,10 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         Probably only makes sense use /query command if you decide to explore
         """
         # check model is valid
+        # todo: if model is missing - show user a menu with available models..
         if model not in self.models_data:
-            raise RuntimeError(f"Model {model} is not in the list")
-        self.model = model
+            raise RuntimeError(f"Model {model} is not in the list, use /list_models to see available models")
+        self._query_config.model = model
         return f"Active model: {model}"
 
     def save_error(self, timestamp, error, traceback, message_text):
@@ -391,8 +398,13 @@ class ChatBot:  # todo: rename to OpenAIChatbot
             limit = int(limit)
         return self._traceback[-limit:]
 
-    @telegram_commands_registry.register(['/error', '/errors', '/dev', '/describe_error'])
+    @telegram_commands_registry.register(['/error', '/describe_error'], group='dev')
     def describe_errors(self, limit=1):
+        """
+        Get last errors
+        :param limit: int, number of errors to return
+        :return: str
+        """
         if limit is not None:
             limit = int(limit)
         errors = self.get_errors(limit)
@@ -405,6 +417,17 @@ class ChatBot:  # todo: rename to OpenAIChatbot
                 traceback=traceback
             ))
         return '\n'.join(res)
+
+    @telegram_commands_registry.register(['/raw_query', '/query'], group='dev')
+    def raw_query(self, prompt, **kwargs):
+        """
+        Send query to openai model "as is", without any extra context
+        :param prompt:
+        :param kwargs: additional parameters to pass to openai.Completion.create
+        Description https://beta.openai.com/docs/api-reference/completions/create
+        :return:
+        """
+        return query_openai(prompt, config=self._query_config, **kwargs)
 
     # ------------------------------
     # Main chat method
