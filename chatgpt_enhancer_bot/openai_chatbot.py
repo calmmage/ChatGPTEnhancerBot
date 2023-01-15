@@ -324,7 +324,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         if command is None:
             help_message = "Available commands:\n"
             for command in self.command_registry.list_commands():
-                func_name = self.command_registry.get_function(command)
+                # todo: add command groups
                 help_message += f'{command}: {self.command_registry.get_description(command)}\n'
             return help_message
         else:
