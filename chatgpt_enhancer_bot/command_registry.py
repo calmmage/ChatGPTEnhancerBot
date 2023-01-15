@@ -1,3 +1,6 @@
+from functools import lru_cache
+
+
 class CommandRegistry:
     """
     Register a map from command shortcut to function name
@@ -7,11 +10,13 @@ class CommandRegistry:
         self.functions = {}
         self.descriptions = {}
         self.docstrings = {}
+        self.groups = {}
 
-    def register(self, shortcuts=None):
+    def register(self, shortcuts=None, group=None):
         """
         Register a function as a command
         :param shortcuts: list of shortcuts for a function
+        :param group: group of the command (for sorting - topic, model, parameters, etc.)
         :return: decorator
         """
         if shortcuts is None:
@@ -22,27 +27,35 @@ class CommandRegistry:
         def wrapper(func):
             name = func.__name__
             doc = func.__doc__
-            desc = doc.strip().splitlines()[
-                0] if doc else "This docstring is missing!! Abuse @petr_lavrov until he writes it!!"
             if not shortcuts:
                 shortcuts.append(f"/{name}")
-            for shortcut in shortcuts:
-                self.functions[shortcut] = name
-                self.descriptions[shortcut] = desc
-                self.docstrings[shortcut] = doc
+            self.add_command(name, shortcuts, doc, group or func.__class__)
+
+            func.__shortcuts__ = shortcuts
             return func
 
         return wrapper
 
+    def add_command(self, command, shortcuts, docstring, group):
+        desc = docstring.strip().splitlines()[
+            0] if docstring else "This docstring is missing!! Abuse @petr_lavrov until he writes it!!"
+
+        for shortcut in shortcuts:
+            self.functions[shortcut] = command
+            self.descriptions[shortcut] = desc
+            self.docstrings[shortcut] = docstring
+            self.groups[command] = group
+
     def update(self, commands):
         self.functions.update(commands)
 
+    @lru_cache(maxsize=1)
     def list_commands(self):
         """
         List all commands
         :return: List[str]
         """
-        return list(self.functions.keys())
+        return sorted(self.functions.keys(), key=self.get_group)
 
     def get_function(self, command):
         return self.functions[command]
@@ -52,3 +65,6 @@ class CommandRegistry:
 
     def get_docstring(self, command):
         return self.docstrings[command]
+
+    def get_group(self, command):
+        return self.groups[command]

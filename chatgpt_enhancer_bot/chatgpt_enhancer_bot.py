@@ -51,6 +51,7 @@ def chat(prompt, user):
 
 def chat_handler(update: Update, context: CallbackContext) -> None:
     response = chat(update.message.text, user=update.effective_user.username)
+    response = clean_markdown(response)
     update.message.reply_markdown_v2(response)
 
 
@@ -134,7 +135,7 @@ def error_handler(update: Update, context: CallbackContext):
     funny_consolation = generate_funny_consolation().lower()
     error_message = f"""Sorry, seems {funny_reason}. 
 There was an error: {context.error}. 
-You can use /dev command to see the traceback.. or bump @petr_lavrov about it
+You can use /error command to see the traceback.. or bump @petr_lavrov about it
 Please, accept my sincere apologies. And.. {funny_consolation}.
 If the error persists, you can also try /new_chat command to start a new conversation.
 """
