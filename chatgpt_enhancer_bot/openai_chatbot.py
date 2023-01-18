@@ -5,16 +5,13 @@ import logging
 import os.path
 import pprint
 
-import openai
 from random_word import RandomWords
 
 from command_registry import CommandRegistry
-from openai_wrapper import DEFAULT_QUERY_CONFIG, query_openai
-from utils import get_secrets
+from openai_wrapper import get_openai_wrapper, DEFAULT_QUERY_CONFIG
 
-secrets = get_secrets()
+openai_wrapper = get_openai_wrapper()
 
-openai.api_key = secrets["openai_api_key"]
 
 CONVERSATIONS_HISTORY_PATH = 'conversations_history.json'
 HISTORY_WORD_LIMIT = 1000
@@ -363,7 +360,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         else:
             return self.command_registry.get_docstring(command)
 
-    models_data = {m.id: m for m in openai.Model.list().data}
+    models_data = {m.id: m for m in openai_wrapper.Model.list().data}
 
     def get_models_ids(self):
         """
@@ -503,7 +500,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         augmented_prompt += f"{HUMAN_TOKEN}: {prompt}\n"
         logger.debug(augmented_prompt)  # print(augmented_prompt)
 
-        response_text = query_openai(augmented_prompt, self._query_config, **kwargs)  # todo: pass hash of user
+        response_text = openai_wrapper.query(augmented_prompt, self._query_config, **kwargs)  # todo: pass hash of user
 
         # Extract the response from the API response
         response_text = response_text.strip()
