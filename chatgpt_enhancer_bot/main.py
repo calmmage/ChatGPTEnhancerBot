@@ -173,8 +173,8 @@ You can use /error command to see the traceback.. or bump @petr_lavrov about it
 Please, accept my sincere apologies. And.. {funny_consolation}.
 If the error persists, you can also try /new_chat command to start a new conversation.
 """
-    if bot.markdown_enabled:
-        error_message += "\n Or /disable_markdown to disable markdown in this chat"
+    # if bot.markdown_enabled:
+    #     error_message += "\n Or /disable_markdown to disable markdown in this chat"
     update.message.reply_text(error_message)
 
 
