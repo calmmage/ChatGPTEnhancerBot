@@ -4,15 +4,15 @@ import json
 import logging
 import os.path
 import pprint
+from functools import cached_property
 
 from random_word import RandomWords
 from telegram.utils.helpers import escape_markdown
 
-from chatgpt_enhancer_bot.command_registry import CommandRegistry
 from openai_wrapper import get_openai_wrapper, DEFAULT_QUERY_CONFIG
+from .command_registry import CommandRegistry
 
 openai_wrapper = get_openai_wrapper()
-
 
 CONVERSATIONS_HISTORY_PATH = 'conversations_history.json'
 HISTORY_WORD_LIMIT = 1000
@@ -372,7 +372,9 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         else:
             return self.command_registry.get_docstring(command)
 
-    models_data = {m.id: m for m in openai_wrapper.api.Model.list().data}
+    @cached_property
+    def models_data(self):
+        return {m.id: m for m in openai_wrapper.api.Model.list().data}
 
     def get_models_ids(self):
         """
