@@ -25,3 +25,17 @@ def generate_funny_reason():
 
 def generate_funny_consolation():
     return random.choice(consolations)
+
+
+def split_to_code_blocks(text):
+    is_code_block = False
+    blocks = []
+    for block in text.split("```"):
+        if block:
+            blocks.append(
+
+                {"text": block,
+                 "is_code_block": is_code_block}
+            )
+        is_code_block = not is_code_block
+    return blocks

@@ -15,7 +15,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from telegram.utils.helpers import escape_markdown
 
 from .openai_chatbot import ChatBot, telegram_commands_registry
-from .utils import get_secrets, generate_funny_reason, generate_funny_consolation
+from .utils import get_secrets, generate_funny_reason, generate_funny_consolation, split_to_code_blocks
 
 secrets = get_secrets()
 
@@ -45,24 +45,45 @@ def get_bot(user) -> ChatBot:
     return bots[user]
 
 
-def send_message_to_user(message_to_reply_to, message, enable_markdown=False, escape_markdown_flag=False):
+def send_message_with_markdown(message_to_reply_to, message, enable_markdown=False, escape_markdown_flag=False):
     if enable_markdown:
         if escape_markdown_flag:
             message = escape_markdown(message, version=2)
         try:
             return message_to_reply_to.reply_markdown_v2(message)
         except:  # can't parse entities
-            message = "Unable to parse markdown in this response. Here's the raw text:\n\n" + message
-            return message_to_reply_to.reply_text(message)
+            error_message = "Unable to parse markdown in this response. Here's the raw text:\n\n" + message
+            return message_to_reply_to.reply_text(error_message)
     else:
         return message_to_reply_to.reply_text(message)
+
+
+def send_message_to_user(message_to_reply_to, message):
+    # just always send as plain text for now
+    # step 1: tell the bot to always use ``` for the code
+    # step 2: parse the code blocks in text
+    blocks = split_to_code_blocks(message)
+    sent_messages = []
+    for block in blocks:
+        if block['is_code_block']:
+            text = f"```{block['text']}```"
+        else:
+            text = block['text']
+        msg = send_message_with_markdown(message_to_reply_to, text, enable_markdown=block['is_code_block'])
+        sent_messages.append(msg)
+
+    if len(sent_messages) == 1:
+        # todo: add support for multiple messages everywhere where this is used
+        return sent_messages[0]
+    return sent_messages
 
 
 def chat_handler(update: Update, context: CallbackContext) -> None:
     user = update.effective_user.username
     bot = get_bot(user)
     reply = bot.chat(prompt=update.message.text)
-    send_message_to_user(update.message, reply, enable_markdown=bot.markdown_enabled, escape_markdown_flag=False)
+    # send_message_to_user(update.message, reply, enable_markdown=bot.markdown_enabled, escape_markdown_flag=False)
+    send_message_to_user(update.message, reply)
 
 
 def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
@@ -101,8 +122,11 @@ def button_callback(update, context):
     else:
         result = bot.chat(prompt)
 
-    result = escape_markdown(result)
-    response_message = update.effective_message.reply_markdown_v2(result)
+    # markdown_safe =
+    # escape_markdown_flag = not markdown_safe
+    # response_message = send_message_to_user(update.effective_message, result, enable_markdown=bot.markdown_enabled,
+    #                                         escape_markdown_flag=escape_markdown_flag)
+    response_message = send_message_to_user(update.effective_message, result)
     if result.startswith("Active topic"):
         response_message.pin()
 
@@ -167,8 +191,9 @@ def make_command_handler(method_name):
         if not result:
             result = f"Command {command} finished successfully"
         escape_markdown_flag = not bot.command_registry.is_markdown_safe(command)
-        response_message = send_message_to_user(update.effective_message, result, enable_markdown=bot.markdown_enabled,
-                                                escape_markdown_flag=escape_markdown_flag)
+        # response_message = send_message_to_user(update.effective_message, result, enable_markdown=bot.markdown_enabled,
+        #                                         escape_markdown_flag=escape_markdown_flag)
+        response_message = send_message_to_user(update.effective_message, result)
         if result.startswith("Active topic"):
             response_message.pin()
 
