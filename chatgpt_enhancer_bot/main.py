@@ -14,8 +14,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotComm
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
 from telegram.utils.helpers import escape_markdown
 
-from openai_chatbot import ChatBot, telegram_commands_registry
-from utils import get_secrets, generate_funny_reason, generate_funny_consolation
+from .openai_chatbot import ChatBot, telegram_commands_registry
+from .utils import get_secrets, generate_funny_reason, generate_funny_consolation
 
 secrets = get_secrets()
 
