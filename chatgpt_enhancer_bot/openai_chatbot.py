@@ -230,7 +230,8 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._conversations_history[self._active_topic] = []
         self.topic_count += 1
         # todo: name a topic accordingly, after a few messages
-        return f"Active topic: *{escape_markdown(self._active_topic, 2)}*"
+        # return f"Active topic: *{escape_markdown(self._active_topic, 2)}*"
+        return f"Active topic: {self._active_topic}"
 
     def _generate_new_topic_name(self):
         # todo: rename topic according to its history - get the syntactic analysis
