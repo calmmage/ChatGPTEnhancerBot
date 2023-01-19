@@ -190,7 +190,7 @@ def make_command_handler(method_name):
         result = method(*qargs, **qkwargs)  # todo: parse kwargs from the command
         if not result:
             result = f"Command {command} finished successfully"
-        escape_markdown_flag = not bot.command_registry.is_markdown_safe(command)
+        # escape_markdown_flag = not bot.command_registry.is_markdown_safe(command)
         # response_message = send_message_to_user(update.effective_message, result, enable_markdown=bot.markdown_enabled,
         #                                         escape_markdown_flag=escape_markdown_flag)
         response_message = send_message_to_user(update.effective_message, result)
