@@ -12,6 +12,7 @@ from typing import Dict
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
+from telegram.utils.helpers import escape_markdown
 
 from openai_chatbot import ChatBot, telegram_commands_registry
 from utils import get_secrets, generate_funny_reason, generate_funny_consolation
@@ -44,15 +45,24 @@ def get_bot(user) -> ChatBot:
     return bots[user]
 
 
-def chat(prompt, user):
-    bot = get_bot(user)
-    return bot.chat(prompt=prompt)
+def send_message_to_user(message_to_reply_to, message, enable_markdown=False, escape_markdown_flag=False):
+    if enable_markdown:
+        if escape_markdown_flag:
+            message = escape_markdown(message, version=2)
+        try:
+            return message_to_reply_to.reply_markdown_v2(message)
+        except:  # can't parse entities
+            message = "Unable to parse markdown in this response. Here's the raw text:\n\n" + message
+            return message_to_reply_to.reply_text(message)
+    else:
+        return message_to_reply_to.reply_text(message)
 
 
 def chat_handler(update: Update, context: CallbackContext) -> None:
-    response = chat(update.message.text, user=update.effective_user.username)
-    response = clean_markdown(response)
-    update.message.reply_markdown_v2(response)
+    user = update.effective_user.username
+    bot = get_bot(user)
+    reply = bot.chat(prompt=update.message.text)
+    send_message_to_user(update.message, reply, enable_markdown=bot.markdown_enabled, escape_markdown_flag=False)
 
 
 def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
@@ -91,7 +101,7 @@ def button_callback(update, context):
     else:
         result = bot.chat(prompt)
 
-    result = clean_markdown(result)
+    result = escape_markdown(result)
     response_message = update.effective_message.reply_markdown_v2(result)
     if result.startswith("Active topic"):
         response_message.pin()
@@ -139,14 +149,9 @@ You can use /error command to see the traceback.. or bump @petr_lavrov about it
 Please, accept my sincere apologies. And.. {funny_consolation}.
 If the error persists, you can also try /new_chat command to start a new conversation.
 """
+    if bot.markdown_enabled:
+        error_message += "\n Or /disable_markdown to disable markdown in this chat"
     update.message.reply_text(error_message)
-
-
-def clean_markdown(msg: str):
-    chars = '()[]_~<>#+-=|{}.!'
-    for c in chars:
-        msg = msg.replace(c, '\\' + c)
-    return msg
 
 
 def make_command_handler(method_name):
@@ -161,8 +166,9 @@ def make_command_handler(method_name):
         result = method(*qargs, **qkwargs)  # todo: parse kwargs from the command
         if not result:
             result = f"Command {command} finished successfully"
-        result = clean_markdown(result)
-        response_message = update.effective_message.reply_markdown_v2(result)
+        escape_markdown_flag = not bot.command_registry.is_markdown_safe(command)
+        response_message = send_message_to_user(update.effective_message, result, enable_markdown=bot.markdown_enabled,
+                                                escape_markdown_flag=escape_markdown_flag)
         if result.startswith("Active topic"):
             response_message.pin()
 

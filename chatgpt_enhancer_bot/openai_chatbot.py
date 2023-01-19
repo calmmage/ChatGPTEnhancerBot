@@ -6,6 +6,7 @@ import os.path
 import pprint
 
 from random_word import RandomWords
+from telegram.utils.helpers import escape_markdown
 
 from command_registry import CommandRegistry
 from openai_wrapper import get_openai_wrapper, DEFAULT_QUERY_CONFIG
@@ -20,7 +21,6 @@ HUMAN_TOKEN = '[H]'
 BOT_TOKEN = '[B]'
 CHATBOT_INTRO_MESSAGE = f"The following is a conversation of human {HUMAN_TOKEN} with an AI assistant {BOT_TOKEN}. " \
                         "The assistant is helpful, creative, clever, and very friendly. " \
-                        "All code must be in ```{lang} code ```. " \
                         "The bot was created by OpenAI team and enhanced by Petr Lavrov. \n"
 
 WELCOME_MESSAGE = """This is an alpha version of the Petr Lavrov's ChatGPT enhancer.
@@ -82,6 +82,18 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._conversations_history = self._load_conversations_history()  # attempt to make 'new chat' a thing
         # self._start_new_topic()
         self._traceback = []
+
+        self.markdown_enabled = True
+
+    @telegram_commands_registry.register(group='configs')
+    def enable_markdown(self):
+        self.markdown_enabled = True
+        return "Markdown enabled"
+
+    @telegram_commands_registry.register(group='configs')
+    def disable_markdown(self):
+        self.markdown_enabled = False
+        return "Markdown disabled"
 
     @property
     @telegram_commands_registry.register('/model', group='models')
@@ -200,7 +212,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._conversations_history[topic].append((prompt, response_text, timestamp.isoformat()))
         self._save_conversations_history()
 
-    @telegram_commands_registry.register('/new_topic', group='topics')
+    @telegram_commands_registry.register(['/new_topic', '/nt'], group='topics', is_markdown_safe=True)
     def add_new_topic(self, name=None):
         """
         Start a new conversation thread with clean context. Saves up the token quota.
@@ -216,7 +228,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._conversations_history[self._active_topic] = []
         self.topic_count += 1
         # todo: name a topic accordingly, after a few messages
-        return f"Active topic: *{self._active_topic}*"
+        return f"Active topic: *{escape_markdown(self._active_topic, 2)}*"
 
     def _generate_new_topic_name(self):
         # todo: rename topic according to its history - get the syntactic analysis
@@ -242,7 +254,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         """
         return '\n'.join(f"*{t}*" if t == self._active_topic else t for t in self.list_topics(limit))
 
-    @telegram_commands_registry.register(['/switch_topic', '/st'], group='topics')
+    @telegram_commands_registry.register(['/switch_topic', '/st'], group='topics', is_markdown_safe=True)
     def switch_topic(self, name=None, index=None):
         """
         Switch ChatGPT context to another thread of discussion. Provide name or index of the chat to switch
@@ -253,22 +265,22 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         if name is not None:
             if name in self._conversations_history:  # todo: fuzzy matching, especially using our random words
                 self._active_topic = name
-                return f"Active topic: {name}"  # todo - log instead? And then send logs to user
+                return f"Active topic: *{escape_markdown(name, 2)}*"  # todo - log instead? And then send logs to user
             guess = try_guess_topic_name(name, self._conversations_history.keys())
             if guess is not None:
                 self._active_topic = guess
-                return f"Active topic: {guess}"
+                return f"Active topic: *{escape_markdown(guess, 2)}*"
             try:
                 index = int(name)
             except:
-                raise RuntimeError(f"Missing topic with name {name}")
+                raise RuntimeError(f"Missing topic with name {escape_markdown(name, 2)}")
         if index is not None:
             name = list(self._conversations_history.keys())[-index]
             self._active_topic = name
-            return f"Active topic: {name}"  # todo - log instead? And then send logs to user
+            return f"Active topic: *{escape_markdown(name, 2)}*"  # todo - log instead? And then send logs to user
         raise RuntimeError("Both name and index are missing")
 
-    @telegram_commands_registry.register(group='topics')
+    @telegram_commands_registry.register(group='topics', is_markdown_safe=True)
     def rename_topic(self, new_name, topic=None):
         """
         Rename conversation thread for more convenience and future reference
@@ -279,21 +291,21 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         """
         # check if new name is already taken
         if new_name in self._conversations_history:
-            raise RuntimeError(f"Name {new_name} already taken")
+            raise RuntimeError(f"Name {escape_markdown(new_name, 2)} already taken")
         if topic is None:
             topic = self._active_topic
             self._active_topic = new_name
         elif topic not in self._conversations_history:
-            raise RuntimeError(f"Topic {topic} not found")
+            raise RuntimeError(f"Topic {escape_markdown(topic, 2)} not found")
 
         # update conversation history
         self._conversations_history[new_name] = self._conversations_history[topic]
         del self._conversations_history[topic]
 
         if new_name == self._active_topic:
-            return f"Active topic: {new_name}"
+            return f"Active topic: *{escape_markdown(new_name, 2)}*"
         else:
-            return f"Renamed {topic} to {new_name}"
+            return f"Renamed {escape_markdown(topic, 2)} to {escape_markdown(new_name, 2)}"
 
     @staticmethod
     def calculate_history_depth(history, word_limit):
@@ -441,7 +453,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         res = []
         for timestamp, error, traceback, message_text in errors:
             res.append(ERROR_MESSAGE_TEMPLATE.format(
-                error=error,
+                error=escape_markdown(error, version=2),
                 timestamp=timestamp,
                 message_text=message_text,
                 traceback=traceback
@@ -485,6 +497,8 @@ class ChatBot:  # todo: rename to OpenAIChatbot
 
         # intro message for model
         augmented_prompt = CHATBOT_INTRO_MESSAGE
+        if self.markdown_enabled:
+            augmented_prompt = "USE MARKDOWN FOR ALL COMPLETIONS. \n" + augmented_prompt
 
         # history - for context
         full_history = self.get_history(limit=0)

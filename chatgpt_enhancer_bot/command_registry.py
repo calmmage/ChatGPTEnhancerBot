@@ -11,8 +11,9 @@ class CommandRegistry:
         self.descriptions = {}
         self.docstrings = {}
         self.groups = {}
+        self._is_markdown_safe = {}
 
-    def register(self, shortcuts=None, group=None):
+    def register(self, shortcuts=None, group=None, is_markdown_safe=False):
         """
         Register a function as a command
         :param shortcuts: list of shortcuts for a function
@@ -29,14 +30,14 @@ class CommandRegistry:
             doc = func.__doc__
             if not shortcuts:
                 shortcuts.append(f"/{name}")
-            self.add_command(name, shortcuts, doc, group or func.__class__)
+            self.add_command(name, shortcuts, doc, group or func.__class__, is_markdown_safe=is_markdown_safe)
 
             func.__shortcuts__ = shortcuts
             return func
 
         return wrapper
 
-    def add_command(self, command, shortcuts, docstring, group):
+    def add_command(self, command, shortcuts, docstring, group, is_markdown_safe=False):
         desc = docstring.strip().splitlines()[
             0] if docstring else "This docstring is missing!! Abuse @petr_lavrov until he writes it!!"
 
@@ -45,6 +46,7 @@ class CommandRegistry:
             self.descriptions[shortcut] = desc
             self.docstrings[shortcut] = docstring
             self.groups[shortcut] = group
+            self._is_markdown_safe[shortcut] = is_markdown_safe
 
         # todo: add command as a separate object as well - avoid duplication in help command. Dataclass?
 
@@ -70,3 +72,6 @@ class CommandRegistry:
 
     def get_group(self, command):
         return self.groups[command]
+
+    def is_markdown_safe(self, command):
+        return self._is_markdown_safe[command]
