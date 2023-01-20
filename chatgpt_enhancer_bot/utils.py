@@ -2,6 +2,16 @@ import os
 import random
 
 
+def try_guess_topic_name(name, candidates):
+    matches = [c for c in candidates if name in c]
+    if len(matches) == 1:
+        return matches[0]
+    matches = [c for c in candidates if name.lower() in c.lower()]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
 def get_secrets():
     # Load the secrets from a file
     secrets = {}

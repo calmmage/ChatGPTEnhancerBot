@@ -9,6 +9,7 @@ from functools import cached_property
 from random_word import RandomWords
 from telegram.utils.helpers import escape_markdown
 
+from chatgpt_enhancer_bot.utils import try_guess_topic_name
 from openai_wrapper import get_openai_wrapper, DEFAULT_QUERY_CONFIG
 from .command_registry import CommandRegistry
 
@@ -48,16 +49,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 telegram_commands_registry = CommandRegistry()
-
-
-def try_guess_topic_name(name, candidates):
-    matches = [c for c in candidates if name in c]
-    if len(matches) == 1:
-        return matches[0]
-    matches = [c for c in candidates if name.lower() in c.lower()]
-    if len(matches) == 1:
-        return matches[0]
-    return None
 
 
 class ChatBot:  # todo: rename to OpenAIChatbot
