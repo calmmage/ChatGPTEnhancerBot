@@ -97,11 +97,14 @@ class ChatBot:  # todo: rename to OpenAIChatbot
     #     return "Markdown disabled"
 
     @property
-    @telegram_commands_registry.register('/model', group='models')
     def active_model(self):
         """ Get active model """
         # todo: figure out how to handle multpile configs
         return self._query_config.model
+
+    @telegram_commands_registry.register('/model', group='models')
+    def get_active_model(self):
+        return f"Active model: {self.active_model}"
 
     @telegram_commands_registry.register(group='configs')
     def set_temperature(self, temperature: float):
