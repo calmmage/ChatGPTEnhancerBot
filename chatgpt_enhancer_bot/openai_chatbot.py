@@ -9,6 +9,7 @@ from functools import cached_property
 from random_word import RandomWords
 from telegram.utils.helpers import escape_markdown
 
+from chatgpt_enhancer_bot.utils import try_guess_topic_name
 from openai_wrapper import get_openai_wrapper, DEFAULT_QUERY_CONFIG
 from .command_registry import CommandRegistry
 
@@ -50,16 +51,6 @@ logger = logging.getLogger(__name__)
 telegram_commands_registry = CommandRegistry()
 
 
-def try_guess_topic_name(name, candidates):
-    matches = [c for c in candidates if name in c]
-    if len(matches) == 1:
-        return matches[0]
-    matches = [c for c in candidates if name.lower() in c.lower()]
-    if len(matches) == 1:
-        return matches[0]
-    return None
-
-
 class ChatBot:  # todo: rename to OpenAIChatbot
     DEFAULT_TOPIC_NAME = 'General'
 
@@ -97,11 +88,14 @@ class ChatBot:  # todo: rename to OpenAIChatbot
     #     return "Markdown disabled"
 
     @property
-    @telegram_commands_registry.register('/model', group='models')
     def active_model(self):
         """ Get active model """
         # todo: figure out how to handle multpile configs
         return self._query_config.model
+
+    @telegram_commands_registry.register('/model', group='models')
+    def get_active_model(self):
+        return f"Active model: {self.active_model}"
 
     @telegram_commands_registry.register(group='configs')
     def set_temperature(self, temperature: float):
@@ -111,6 +105,15 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._query_config.temperature = temperature
         return f"Temperature set to {temperature}"
 
+    model_token_limit = {
+        "text-davinci-003": 4000,
+        "text-curie-001": 2048,
+        "text-babbage-001": 2048,
+        "text-ada-001": 2048,
+        "code-davinci-002": 8000,
+        "code-cushman-001": 2048
+    }
+
     @telegram_commands_registry.register(['/set_max_tokens', '/set_response_length'], group='configs')
     def set_max_tokens(self, max_tokens: int):
         """
@@ -119,7 +122,10 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         :param max_tokens:
         :return:
         """
-        model_token_limit = self.get_model_info(self.active_model)['max_tokens']
+        max_tokens = int(max_tokens)
+        model = self.active_model
+        # todo: change the limits when model is changed
+        model_token_limit = self.model_token_limit.get(model, 4000 if 'davinci' in model else 2048)
         if max_tokens > model_token_limit - self._history_word_limit:
             raise ValueError(
                 f"Max tokens combined with history word limit ({self._history_word_limit}) should not exceed {model_token_limit}")
