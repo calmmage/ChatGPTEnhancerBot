@@ -12,7 +12,10 @@ def test_model(chatbot_fixture):
     bot = chatbot_fixture
     # step one - test that it works at all
     res = bot.get_active_model()
-    assert res == 'text-ada:001'
+    assert res == 'Active model: text-davinci-003'
+    res = bot.switch_model('text-ada:001')
+    assert bot.active_model == 'text-ada:001'
+    assert res == 'Active model: text-ada:001'
 
 
 def test_list_models(chatbot_fixture):
