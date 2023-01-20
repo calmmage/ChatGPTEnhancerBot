@@ -105,6 +105,15 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._query_config.temperature = temperature
         return f"Temperature set to {temperature}"
 
+    model_token_limit = {
+        "text-davinci-003": 4000,
+        "text-curie-001": 2048,
+        "text-babbage-001": 2048,
+        "text-ada-001": 2048,
+        "code-davinci-002": 8000,
+        "code-cushman-001": 2048
+    }
+
     @telegram_commands_registry.register(['/set_max_tokens', '/set_response_length'], group='configs')
     def set_max_tokens(self, max_tokens: int):
         """
@@ -113,7 +122,10 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         :param max_tokens:
         :return:
         """
-        model_token_limit = self.get_model_info(self.active_model)['max_tokens']
+        max_tokens = int(max_tokens)
+        model = self.active_model
+        # todo: change the limits when model is changed
+        model_token_limit = self.model_token_limit.get(model, 4000 if 'davinci' in model else 2048)
         if max_tokens > model_token_limit - self._history_word_limit:
             raise ValueError(
                 f"Max tokens combined with history word limit ({self._history_word_limit}) should not exceed {model_token_limit}")
