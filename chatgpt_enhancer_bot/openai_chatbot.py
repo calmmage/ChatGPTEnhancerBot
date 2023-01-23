@@ -6,11 +6,11 @@ import os.path
 import pprint
 from functools import cached_property
 
+from openai_wrapper import get_openai_wrapper, DEFAULT_QUERY_CONFIG
 from random_word import RandomWords
 from telegram.utils.helpers import escape_markdown
 
 from chatgpt_enhancer_bot.utils import try_guess_topic_name
-from openai_wrapper import get_openai_wrapper, DEFAULT_QUERY_CONFIG
 from .command_registry import CommandRegistry
 
 openai_wrapper = get_openai_wrapper()
@@ -70,6 +70,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._history_word_limit = history_word_limit
 
         self._active_topic = self.DEFAULT_TOPIC_NAME
+        # todo: remember last active topic for each user!
         self._conversations_history_path = conversations_history_path
         self._conversations_history = self._load_conversations_history()  # attempt to make 'new chat' a thing
         # self._start_new_topic()
@@ -435,7 +436,9 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         """
         return pprint.pformat(self.get_model_info(model_id))
 
-    @telegram_commands_registry.register(group='models')
+    # todo - deprecate? no point switching model, when you can query directly using command.
+    #  None other model would work for chat
+    @telegram_commands_registry.register(['/switch_model', '/set_active_model'], group='models')
     def switch_model(self, model=None):
         """Switch under-the-hood model that this bot uses
         Most notable models:
@@ -480,7 +483,9 @@ class ChatBot:  # todo: rename to OpenAIChatbot
             ))
         return '\n'.join(res)
 
-    @telegram_commands_registry.register(['/raw_query', '/query'], group='dev')
+    # custom commands
+
+    @telegram_commands_registry.register(['/raw_query', '/query'], group='custom')
     def raw_query(self, prompt, **kwargs):
         """
         Send query to openai model "as is", without any extra context
@@ -489,11 +494,48 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         Description https://beta.openai.com/docs/api-reference/completions/create
         :return:
         """
-        return query_openai(prompt, config=self._query_config, **kwargs)
+        return openai_wrapper.query(prompt, config=self._query_config, **kwargs)
+
+    @telegram_commands_registry.register(group='custom')
+    def cheap(self, prompt, **kwargs):
+        """
+        Using cheaper and simpler Curie model - Send query to openai_wrapper model "as is", without any extra context
+        :param prompt: prompt to send to openai_wrapper
+        :param kwargs: additional parameters to pass to openai_wrapper.Completion.create
+        Description https://beta.openai.com/docs/api-reference/completions/create
+        :return:
+        """
+        return openai_wrapper.query_cheap(prompt, config=self._query_config, **kwargs)
+
+    # def get_code(self, prompt, model='', **kwargs):
+    #     """
+    #     Get code from openai_wrapper model
+    #     :param prompt:
+    #     :param kwargs: additional parameters to pass to openai_wrapper.Completion.create
+    #     Description https://beta.openai.com/docs/api-reference/completions/create
+    #     :return:
+    #     """
+    #     return query_openai(prompt, config=self._query_config, **kwargs)
 
     # ------------------------------
     # Main chat method
 
+    # ask
+    @telegram_commands_registry.register(group='custom')
+    def question(self, prompt, **kwargs):
+        # determine topic
+        TOPIC_REQUEST_TEMPLATE = "What is the topic of this question?:\"{}\""
+        topic = openai_wrapper.query_cheap(TOPIC_REQUEST_TEMPLATE.format(prompt))
+        # todo: edit most recent topic message
+
+        # create new topic
+        res = self.add_new_topic(topic)
+
+        answer = self.chat(prompt, **kwargs)
+        return res + '\n' + answer  # todo: return topic and answer separately
+
+    # @telegram_commands_registry.register(group='custom', is_markdown_safe=True)
+    @telegram_commands_registry.register(group='custom')
     def chat(self, prompt, **kwargs):
         """
         https://beta.openai.com/docs/api-reference/completions/create
