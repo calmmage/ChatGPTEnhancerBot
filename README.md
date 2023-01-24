@@ -35,9 +35,9 @@ emotional support. This could include active listening, validation, and guidance
 In this case, you are asking ChatGPT to generate a response that is similar to what a person might write in a journal to
 offer themselves emotional support. This could include self-compassion, self-reflection, and affirmations.
 
-2) Continuity. Let the bot rememeber...
+2) Continuity. Let the bot remember...
 
-- content of your past converstaions?
+- content of your past conversations?
 - general information about yourself?
 - Some extra info from other areas (e.g. like Siri)
 
@@ -53,7 +53,7 @@ How to do? Chat history!
 
 # Quick Notes - Inbox
 
-1) Try Use another model - davinci-instruct-beta:2.0.0 ! This is the predecessor of chatgpt!
+1) Try to use another model - davinci-instruct-beta:2.0.0 ! This is the predecessor of chatgpt!
 2) Try unofficial chatgpt api
 3) Delay response messages - or send unsolicited messages. Or split messages in part
    Imitate real human!!

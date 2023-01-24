@@ -90,7 +90,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
     @property
     def active_model(self):
         """ Get active model """
-        # todo: figure out how to handle multpile configs
+        # todo: figure out how to handle multiple configs
         return self._query_config.model
 
     @telegram_commands_registry.register('/model', group='models')

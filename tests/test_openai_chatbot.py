@@ -3,6 +3,7 @@ import pytest
 from chatgpt_enhancer_bot.openai_chatbot import ChatBot
 
 
+
 @pytest.fixture
 def chatbot_fixture():
     return ChatBot()
