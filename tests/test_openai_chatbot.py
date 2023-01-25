@@ -1,6 +1,6 @@
 import pytest
 
-from openai_chatbot import ChatBot
+from chatgpt_enhancer_bot.openai_chatbot import ChatBot
 
 
 @pytest.fixture
@@ -9,13 +9,14 @@ def chatbot_fixture():
 
 
 def test_help(chatbot_fixture):
+    bot = chatbot_fixture
     # step one - test that it works at all
-    res = chatbot_fixture.help()
+    res = bot.help()
 
     # todo: step two - test that it returns the right thing
     # assert chatbot_fixture.help() ==
 
     # check for specific method
-    res = chatbot_fixture.help('/help')
+    res = bot.help('/help')
     expected_result = ChatBot.help.__doc__
     assert expected_result == res
