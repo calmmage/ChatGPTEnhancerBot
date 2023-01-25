@@ -1,7 +1,9 @@
 # idea: the "openai" part of the bot. API. A functionality
 import datetime
 import json
+import logging
 import os.path
+from functools import lru_cache
 
 import openai
 from random_word import RandomWords
@@ -12,7 +14,7 @@ secrets = get_secrets()
 
 openai.api_key = secrets["openai_api_key"]
 
-CONVERSATIONS_HISTORY_PATH = '../example/bot_python/conversations_history.json'
+CONVERSATIONS_HISTORY_PATH = 'conversations_history.json'
 HISTORY_WORD_LIMIT = 1000
 
 CHATBOT_INTRO_MESSAGE = "The following is a conversation with an AI assistant [Bot]. " \
@@ -22,6 +24,13 @@ RW = RandomWords()
 
 HUMAN_TOKEN = '[HUMAN]'
 BOT_TOKEN = '[BOT]'
+
+# Enable logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+)
+
+logger = logging.getLogger(__name__)
 
 
 class ChatBot:
@@ -38,16 +47,35 @@ class ChatBot:
         self._conversations_history_path = conversations_history_path
         self._conversations_history = self._load_conversations_history()  # attempt to make 'new chat' a thing
         # self._start_new_chat()
+        self._traceback = []
 
     commands = {
+        # todo: group commands by meaning
         "/help": "help",
-        "/new_chat": "help",
+        # todo: register user (/start)
+        # todo:
+
+        # Chat management
+        "/new_chat": "start_new_chat",
         "/chats": "list_chats",
         "/switch_chat": "switch_chat",
         "/rename_chat": "rename_chat",
         "/history": "get_history",
+        # todo: default = everytime new chat (and sometimes go back), or default = everytime same chat (and sometimes go to threads)
+        # todo: map discussions, summary. Group by topic. Depth Navigation.
+
+        # model configuration and preset
+        # todo: history tokens limit
+        # todo: temperature
+        # todo: response tokens limit
         "/list_models": "list_models",
         "/switch_model": "switch_model",
+        # todo: presets, menu
+
+        # dev
+        "/dev": "get_traceback",
+
+        # todo: rewrite all commands as a separate wrapper methods, starting with _command
     }
 
     def _load_conversations_history(self):
@@ -61,6 +89,12 @@ class ChatBot:
         # todo: Implement saving to database
 
     def get_history(self, chat=None, limit=10):
+        """
+        Get conversation history for a particular chat
+        :param chat: what context/thread to use. By default - current
+        :param limit: Max messages from history
+        :return: List[Tuple(prompt, response)]
+        """
         if chat is None:
             chat = self._active_chat
         return self._conversations_history[chat][-limit:]
@@ -73,7 +107,12 @@ class ChatBot:
         self._conversations_history[chat].append((prompt, response_text, timestamp.isoformat()))
         self._save_conversations_history()
 
-    def _start_new_chat(self, name=None):
+    def start_new_chat(self, name=None):
+        """
+        Start a new conversation thread with clean context. Saves up the token quota.
+        :param name: Name for a new chat (don't repeat yourself!)
+        :return:
+        """
         if name is None:
             name = self._generate_new_chat_name()
         if name in self._conversations_history:
@@ -82,6 +121,7 @@ class ChatBot:
         self._active_chat = name
         self._conversations_history[self._active_chat] = []
         self.chat_count += 1
+        # todo: name a chat accordingly, after a few messages
 
     def _generate_new_chat_name(self):
         # todo: rename chat according to its history - get the syntactic analysis (from chatgpt, some lightweight model)
@@ -90,11 +130,22 @@ class ChatBot:
         return new_chat_name
 
     def list_chats(self, limit=10):
+        """ List 10 most recent chats. Use /list_chats 0 to list all chats
+
+        :param limit: Num chats to list. Default - 10. To get all chats - set to 0
+        :return:
+        """
         return list(self._conversations_history.keys())[-limit:]
 
     def switch_chat(self, name=None, index=None):
+        """
+        Switch ChatGPT context to another thread of discussion. Provide name or index of the chat to switch
+        :param name:
+        :param index:
+        :return:
+        """
         if name is not None:
-            if name in self._conversations_history:
+            if name in self._conversations_history:  # todo: fuzzy matching, especially using our random words
                 self._active_chat = name
                 return f"Switched chat to {name} successfully"  # todo - log instead? And then send logs to user
             else:
@@ -109,6 +160,13 @@ class ChatBot:
         raise RuntimeError("Both name and index are missing")
 
     def rename_chat(self, new_name, target_chat=None):
+        """
+        Rename conversation thread for more convenience and future reference
+
+        :param new_name: new name
+        :param target_chat: chat to be renamed, by default - current one.
+        :return:
+        """
         # check if new name is already taken
         if new_name in self._conversations_history:
             raise RuntimeError(f"Name {new_name} already taken")
@@ -147,14 +205,18 @@ class ChatBot:
         return command, args, kwargs
 
     def help(self, command=None):
+        """Auto-generated from docstrings. Use /help {command} for full docstrings
+        *CONGRATULATIONS* You used /help help!!
+        """
+
         if command is None:
             help_message = "Available commands:\n"
             for command in self.commands:
                 func_name = self.commands[command]
                 func = self.__getattribute__(func_name)
-                docstring = func.__doc__
+                docstring = func.__doc__ or "This docstring is missing!! Abuse @petr_lavrov until he writes it!!"
                 first_line = docstring.strip().split('\n')[0]
-                help_message += f'{command}: {first_line}'
+                help_message += f'{command}: {first_line}\n'
             return help_message
         else:
             func_name = self.commands[command]
@@ -163,13 +225,35 @@ class ChatBot:
             return docstring
 
     def switch_model(self, model):
-        # todo: check model is valid
+        """Switch under-the-hood model that ChatGPT uses
+        Most notable models:
+        'text-davinci-003' - strongest and most expensive
+        Others make pretty mush no sense
+        there w
+        """
+        # check model is valid
+        if model not in self.list_models():
+            raise RuntimeError(f"Model {model} is not in the list")
         self.model = model
 
     @staticmethod
+    @lru_cache()
     def list_models():
-        models_list = openai.Model.list()
+        """List available openai models. Play at your own peril - using /switch_model command
+        Mostly old, useless, cheaper versions
+        But also some alternative / experimental ones - most notably codex (for coding) and
+        """
+        models_list = openai.Model.list()  # todo: pretty print
         return [m.id for m in models_list]
+
+    def save_traceback(self, msg):
+        self._traceback.append(msg)
+
+    def get_traceback(self, limit=1):
+        return self._traceback[-limit:]
+
+    # ------------------------------
+    # Main chat method
 
     def chat(self, prompt, model=None, max_tokens=512,
              # temperature=0.5, top_p=1, n=1, stream=False, stop="\n",
@@ -184,7 +268,7 @@ class ChatBot:
         :param kwargs:
         :return:
         """
-        # todo: implement commands. Extract this into a separate method
+        # todo: Commands. Extract this into a separate method
         if prompt.startswith('/'):
             command, qargs, qkwargs = self.parse_query(prompt)
             if command in self.commands:
@@ -207,6 +291,7 @@ class ChatBot:
 
         # include the latest prompt
         augmented_prompt += f"{HUMAN_TOKEN}: {prompt}\n"
+        logger.debug(augmented_prompt)  # print(augmented_prompt)
 
         # Send the message to the OpenAI API
         if model is None:

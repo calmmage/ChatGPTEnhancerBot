@@ -9,7 +9,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 
 # Load the secrets from a file
 secrets = {}
-with open("../../chatgpt_enhancer_bot/secrets.txt", "r") as f:
+with open("secrets.txt", "r") as f:
     for line in f:
         key, value = line.strip().split(":", 1)
         secrets[key] = value
