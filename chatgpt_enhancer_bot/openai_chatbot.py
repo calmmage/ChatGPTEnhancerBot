@@ -135,7 +135,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
     @telegram_commands_registry.register(['/set_history_depth', '/set_history_word_limit'], group='configs')
     def set_history_word_limit(self, limit: int):
         """Set history word limit - how many words to include for chatbot for context"""
-        if limit > MAX_HISTORY_WORD_LIMIT - self._query_config.max_tokens:
+        if limit > MAX_HISTORY_WORD_LIMIT - self._query_config.max_tokens:  # Temporary solution: number of 'tokens' is close to number of 'words'
             raise ValueError(f"Limit must be less than {MAX_HISTORY_WORD_LIMIT}")
         self._history_word_limit = limit
         return f"History word limit set to {limit}"

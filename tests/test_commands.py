@@ -3,15 +3,12 @@ import pytest
 from chatgpt_enhancer_bot.openai_chatbot import ChatBot
 
 
-
-@pytest.fixture # (?) What for is this piece of code?
+@pytest.fixture
 def chatbot_fixture():
     return ChatBot()
 
-
-
 def test_model(chatbot_fixture):
-    bot = chatbot_fixture  # (?) Why is this line necessary?
+    bot = chatbot_fixture
     # step one - test that it works at all
     res = bot.get_active_model()
     assert res == 'Active model: text-davinci-003'
@@ -35,9 +32,19 @@ def test_set_max_tokens(chatbot_fixture):
     assert res == 'Response max tokens length set to 10'
 
 
+# comment 2
+
 def test_set_temperature(chatbot_fixture):
     bot = chatbot_fixture
     # step one - test that it works at all
     res = bot.set_temperature(0.35)
     assert bot._query_config.temperature == 0.35
     assert res == "Temperature set to 0.35"
+
+
+def test_set_history_word_limit(chatbot_fixture):
+    bot = chatbot_fixture
+    # step one - test that it works at all
+    res = bot.set_history_word_limit(3000)
+    assert bot._history_word_limit == 3000
+    assert res == "History word limit set to 3000"
