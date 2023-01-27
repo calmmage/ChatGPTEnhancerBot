@@ -40,9 +40,11 @@ class CommandRegistry:
         return wrapper
 
     # def add_command(self, command, shortcuts, docstring, group, is_markdown_safe=False):
-    def add_command(self, command, shortcuts, docstring, group):
-        desc = docstring.strip().splitlines()[
-            0] if docstring else "This docstring is missing!! Abuse @petr_lavrov until he writes it!!"
+    def add_command(self, command, shortcuts, docstring: str, group):
+        if docstring is not None and docstring.strip():
+            desc = docstring.strip().splitlines()[0]
+        else:
+            desc = "This docstring is missing!! Abuse @petr_lavrov until he writes it!!"
 
         for shortcut in shortcuts:
             self.functions[shortcut] = command
