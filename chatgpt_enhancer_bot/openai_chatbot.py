@@ -6,11 +6,11 @@ import os.path
 import pprint
 from functools import cached_property
 
-from openai_wrapper import get_openai_wrapper, DEFAULT_QUERY_CONFIG
 from random_word import RandomWords
 from telegram.utils.helpers import escape_markdown
 
 from chatgpt_enhancer_bot.utils import try_guess_topic_name
+from openai_wrapper import get_openai_wrapper, DEFAULT_QUERY_CONFIG
 from .command_registry import CommandRegistry
 
 openai_wrapper = get_openai_wrapper()
@@ -101,6 +101,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
     @telegram_commands_registry.register(group='configs')
     def set_temperature(self, temperature: float):
         """ Set temperature for the model """
+        temperature = float(temperature)
         if not 0 <= temperature <= 1:
             raise ValueError("Temperature must be in [0, 1]")
         self._query_config.temperature = temperature
