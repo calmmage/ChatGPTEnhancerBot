@@ -337,35 +337,50 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         return num_items
 
     @staticmethod
-    def parse_query(query):
-        """format: "/command arg text key1=arg1 key2=arg2" """
+    def parse_query(query: str):
+        """format: "/command arg text key1=arg1 key2=arg2\n Long text arg" """
         args = []
         kwargs = {}
         query = query.strip()
 
+        if '\n' in query:
+            query, text = query.split('\n', 1)
+            if text.strip():
+                args.append(text.strip())
+
         if query.startswith('/'):
-            if ' ' not in query:
+            if len(query.split()) == 1:
                 return query, args, kwargs
-            command, query = query.split(' ', 1)
+            command, query = query.split(maxsplit=1)
         else:
             raise RuntimeError(f"command not included? {query}")
 
         if '=' not in query:
-            return command, [query], kwargs
+            args = [query] + args
+            return command, args, kwargs
 
         parts = query.strip().split('=')
 
         # parse arg
-        arg, key = parts[0].rsplit(' ', 1)
-        arg = arg.strip()
-        if arg:
-            args.append(arg)
+        part = parts[0].strip()
+        if ' ' in part:
+            arg, key = part.rsplit(maxsplit=1)
+            arg = arg.strip()
+            if arg:
+                args = [arg] + args
+        else:
+            key = part
 
+        # todo: rework all this. What if someone uses commands for code?
+        #  Let's only allow kwargs in the first line of the message
         # parse kwargs
         for part in parts[1:-1]:
-            value, next_key = part.rsplit(' ', 1)
-            kwargs[key] = value.strip()
-            key = next_key
+            if len(part.split()) > 1:
+                value, next_key = part.rsplit(maxsplit=1)
+                kwargs[key] = value.strip()
+                key = next_key
+            else:
+                raise RuntimeError(f"Invalid query: {query}")
         kwargs[key] = parts[-1].strip()
 
         return command, args, kwargs
