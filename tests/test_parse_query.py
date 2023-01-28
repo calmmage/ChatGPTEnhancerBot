@@ -1,6 +1,6 @@
 import pytest
 
-from chatgpt_enhancer_bot.openai_chatbot import ChatBot
+from chatgpt_enhancer_bot.utils import parse_query
 
 
 @pytest.mark.parametrize("query,expected", [
@@ -15,5 +15,5 @@ from chatgpt_enhancer_bot.openai_chatbot import ChatBot
     ("/command test k1=x k2=y\na k3==d", ("/command", ["test", "a k3==d"], {"k1": "x", "k2": "y"})),
 ])
 def test_parse_query(query, expected):
-    res = ChatBot.parse_query(query)
+    res = parse_query(query)
     assert res == expected
