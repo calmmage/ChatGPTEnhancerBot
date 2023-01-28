@@ -48,7 +48,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-telegram_commands_registry = CommandRegistry()
+gpt_commands_registry = CommandRegistry()
 
 
 class ChatBot:  # todo: rename to OpenAIChatbot
@@ -78,12 +78,12 @@ class ChatBot:  # todo: rename to OpenAIChatbot
 
         # self.markdown_enabled = True
 
-    # @telegram_commands_registry.register(group='configs')
+    # @gpt_commands_registry.register(group='configs')
     # def enable_markdown(self):
     #     self.markdown_enabled = True
     #     return "Markdown enabled"
     #
-    # @telegram_commands_registry.register(group='configs')
+    # @gpt_commands_registry.register(group='configs')
     # def disable_markdown(self):
     #     self.markdown_enabled = False
     #     return "Markdown disabled"
@@ -94,11 +94,11 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         # todo: figure out how to handle multpile configs
         return self._query_config.model
 
-    @telegram_commands_registry.register('/model', group='models')
+    @gpt_commands_registry.register('/model', group='models')
     def get_active_model(self):
         return f"Active model: {self.active_model}"
 
-    @telegram_commands_registry.register(group='configs')
+    @gpt_commands_registry.register(group='configs')
     def set_temperature(self, temperature: float):
         """ Set temperature for the model """
         temperature = float(temperature)
@@ -116,7 +116,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         "code-cushman-001": 2048
     }
 
-    @telegram_commands_registry.register(['/set_max_tokens', '/set_response_length'], group='configs')
+    @gpt_commands_registry.register(['/set_max_tokens', '/set_response_length'], group='configs')
     def set_max_tokens(self, max_tokens: int):
         """
         Set max tokens for the response
@@ -134,7 +134,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._query_config.update(max_tokens=max_tokens)
         return f"Response max tokens length set to {max_tokens}"
 
-    @telegram_commands_registry.register(['/set_history_depth', '/set_history_word_limit'], group='configs')
+    @gpt_commands_registry.register(['/set_history_depth', '/set_history_word_limit'], group='configs')
     def set_history_word_limit(self, limit: int):
         """Set history word limit - how many words to include for chatbot for context"""
         if limit > MAX_HISTORY_WORD_LIMIT - self._query_config.max_tokens:
@@ -144,7 +144,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
 
     @property
     def command_registry(self):
-        return telegram_commands_registry
+        return gpt_commands_registry
 
     # commands = {
     #     # todo: group commands by meaning
@@ -159,7 +159,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
     #     # todo: rewrite all commands as a separate wrapper methods, starting with _command
     # }
 
-    @telegram_commands_registry.register('/topics_menu', group='topics')
+    @gpt_commands_registry.register('/topics_menu', group='topics', active=False)
     def get_topics_menu(self):
         """
         Display topics menu with most recent topics
@@ -192,7 +192,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
             topic = self._active_topic
         return self._conversations_history[topic][-limit:]
 
-    @telegram_commands_registry.register('/history', group='topics')
+    @gpt_commands_registry.register('/history', group='topics')
     def get_history_command(self, topic=None, limit=10):
         """
         Get conversation history for a particular topic. Use limit=5 if getting 'message too long' error
@@ -221,8 +221,8 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         self._conversations_history[topic].append((prompt, response_text, timestamp.isoformat()))
         self._save_conversations_history()
 
-    # @telegram_commands_registry.register(['/new_topic', '/nt'], group='topics', is_markdown_safe=True)
-    @telegram_commands_registry.register(['/new_topic', '/nt'], group='topics')
+    # @gpt_commands_registry.register(['/new_topic', '/nt'], group='topics', is_markdown_safe=True)
+    @gpt_commands_registry.register(['/new_topic', '/nt'], group='topics')
     def add_new_topic(self, name=None):
         """
         Start a new conversation thread with clean context. Saves up the token quota.
@@ -258,15 +258,15 @@ class ChatBot:  # todo: rename to OpenAIChatbot
             limit = int(limit)
         return list(self._conversations_history.keys())[-limit:]
 
-    @telegram_commands_registry.register(['/topics', '/t'], group='topics')
+    @gpt_commands_registry.register(['/topics', '/t'], group='topics')
     def list_topics_command(self, limit=10):
         """
         List 10 most recent topics. Use /list_topics 0 to list all topics
         """
         return '\n'.join(f"*{t}*" if t == self._active_topic else t for t in self.list_topics(limit))
 
-    # @telegram_commands_registry.register(['/switch_topic', '/st'], group='topics', is_markdown_safe=True)
-    @telegram_commands_registry.register(['/switch_topic', '/st'], group='topics')
+    # @gpt_commands_registry.register(['/switch_topic', '/st'], group='topics', is_markdown_safe=True)
+    @gpt_commands_registry.register(['/switch_topic', '/st'], group='topics')
     def switch_topic(self, name=None, index=None):
         """
         Switch ChatGPT context to another thread of discussion. Provide name or index of the chat to switch
@@ -295,8 +295,8 @@ class ChatBot:  # todo: rename to OpenAIChatbot
             return f"Active topic: {name}"  # todo - log instead? And then send logs to user
         raise RuntimeError("Both name and index are missing")
 
-    # @telegram_commands_registry.register(group='topics', is_markdown_safe=True)
-    @telegram_commands_registry.register(group='topics')
+    # @gpt_commands_registry.register(group='topics', is_markdown_safe=True)
+    @gpt_commands_registry.register(group='topics')
     def rename_topic(self, new_name, topic=None):
         """
         Rename conversation thread for more convenience and future reference
@@ -336,15 +336,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
             num_items += 1
         return num_items
 
-    @telegram_commands_registry.register('/start', group='basic')
-    def start(self):
-        """Send a message when the command /start is issued, initiate the bot"""
-        # todo: register user - once the User data model is ready and database is set up
-        # user = update.effective_user
-        # welcome_message = f'Hi {user.username}!\n'
-        return WELCOME_MESSAGE
-
-    @telegram_commands_registry.register('/help', group='basic')
+    @gpt_commands_registry.register('/help', group='basic')
     def help(self, command=None):
         """Auto-generated from docstrings. Use /help {command} for full docstrings
         *CONGRATULATIONS* You used /help help!!
@@ -369,7 +361,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         """
         return sorted(self.models_data.keys())
 
-    @telegram_commands_registry.register('/list_models', group='models')
+    @gpt_commands_registry.register('/list_models', group='models')
     def get_models_ids_command(self):
         """
         Get available openai models ids. Pricing: https://openai.com/api/pricing/
@@ -394,7 +386,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         """
         return self.models_data[model_id]
 
-    @telegram_commands_registry.register('/get_model_info', group='models')
+    @gpt_commands_registry.register('/get_model_info', group='models')
     def get_model_info_command(self, model_id):
         """
         Get model info
@@ -405,7 +397,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
 
     # todo - deprecate? no point switching model, when you can query directly using command.
     #  None other model would work for chat
-    @telegram_commands_registry.register(['/switch_model', '/set_active_model'], group='models')
+    @gpt_commands_registry.register(['/switch_model', '/set_active_model'], group='models')
     def switch_model(self, model=None):
         """Switch under-the-hood model that this bot uses
         Most notable models:
@@ -430,7 +422,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
             limit = int(limit)
         return self._traceback[-limit:]
 
-    @telegram_commands_registry.register(['/error', '/describe_error'], group='dev')
+    @gpt_commands_registry.register(['/error', '/describe_error'], group='dev')
     def describe_errors(self, limit=1):
         """
         Get last errors
@@ -443,7 +435,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         res = []
         for timestamp, error, traceback, message_text in errors:
             res.append(ERROR_MESSAGE_TEMPLATE.format(
-                error=escape_markdown(error, version=2),
+                error=escape_markdown(str(error), version=2),
                 timestamp=timestamp,
                 message_text=message_text,
                 traceback=traceback
@@ -452,7 +444,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
 
     # custom commands
 
-    @telegram_commands_registry.register(['/raw_query', '/query'], group='custom')
+    @gpt_commands_registry.register(['/raw_query', '/query'], group='custom')
     def raw_query(self, prompt, **kwargs):
         """
         Send query to openai model "as is", without any extra context
@@ -463,7 +455,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         """
         return openai_wrapper.query(prompt, config=self._query_config, **kwargs)
 
-    @telegram_commands_registry.register(group='custom')
+    @gpt_commands_registry.register(group='custom')
     def cheap(self, prompt, **kwargs):
         """
         Using cheaper and simpler Curie model - Send query to openai_wrapper model "as is", without any extra context
@@ -474,7 +466,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         """
         return openai_wrapper.query_cheap(prompt, config=self._query_config, **kwargs)
 
-    @telegram_commands_registry.register(group='custom')
+    @gpt_commands_registry.register(group='custom')
     def edit(self, prompt, instruction=None, **kwargs):
         """
         Modify prompt using instruction
@@ -503,7 +495,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
     # Main chat method
 
     # ask
-    @telegram_commands_registry.register(group='custom')
+    @gpt_commands_registry.register(group='custom')
     def question(self, prompt, **kwargs):
         # determine topic
         TOPIC_REQUEST_TEMPLATE = "What is the topic of this question?:\"{}\""
@@ -516,8 +508,8 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         answer = self.chat(prompt, **kwargs)
         return res + '\n' + answer  # todo: return topic and answer separately
 
-    # @telegram_commands_registry.register(group='custom', is_markdown_safe=True)
-    @telegram_commands_registry.register(group='custom')
+    # @gpt_commands_registry.register(group='custom', is_markdown_safe=True)
+    @gpt_commands_registry.register(group='custom')
     def chat(self, prompt, **kwargs):
         """
         https://beta.openai.com/docs/api-reference/completions/create
