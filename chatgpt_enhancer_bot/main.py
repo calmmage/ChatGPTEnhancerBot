@@ -267,7 +267,7 @@ class TelegramBot:
         self._dispatcher.add_error_handler(error_handler)
 
         # order important - this must be after /start command
-        self._dispatcher.add_handler(MessageHandler(Filters.update, self.update_chat_id))
+        self._dispatcher.add_handler(MessageHandler(Filters.update, self.auto_register_new_chats))
 
     def _register_commands(self, command_registry, command_factory):
         for command in command_registry.list_commands():
@@ -302,6 +302,17 @@ class TelegramBot:
                     # touch the touch file
                     with open(TOUCH_FILE_PATH, 'w'):
                         pass
+
+    def auto_register_new_chats(self, update: Update, context: CallbackContext):
+        """
+        Automatically register new chats from all updates, except for the ones from the bot itself
+        :param update:
+        :param context:
+        :return:
+        """
+        if update.effective_user.id == self.bot.id:
+            return
+        self.update_chat_id(update, context)
 
     # on each chat message and command update chat_id
     def update_chat_id(self, update: Update, context: CallbackContext) -> None:
