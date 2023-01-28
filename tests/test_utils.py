@@ -20,7 +20,7 @@ from chatgpt_enhancer_bot.utils import split_to_code_blocks
 def test_split_to_code_blocks(text, expected):
     """test that the text is split into code blocks"""
     res = split_to_code_blocks(text)
-    assert expected == res
+    assert res == expected
 
 
 # todo: change the behavior and update the test

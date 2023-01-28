@@ -1,3 +1,9 @@
+# Branches:
+
+main - most stable version. Only released after tested in beta. @ChatGPTKitBot
+beta - current beta version. @ChatGPTEnhancerBot
+dev - most unstable. Whatever we're currently experimenting with. Might be broken. @PetrLavrovTestBot
+
 # Development plan
 
 1) Functional: Support commands in telegram
