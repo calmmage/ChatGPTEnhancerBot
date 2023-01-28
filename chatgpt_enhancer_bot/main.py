@@ -15,7 +15,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from telegram.utils.helpers import escape_markdown
 
 from .openai_chatbot import ChatBot, telegram_commands_registry
-from .utils import get_secrets, generate_funny_reason, generate_funny_consolation, split_to_code_blocks
+from .utils import get_secrets, generate_funny_reason, generate_funny_consolation, split_to_code_blocks, parse_query
 
 secrets = get_secrets()
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 TOUCH_FILE_PATH = os.path.expanduser('~/heartbeat/chatgpt_enhancer_last_alive')
 os.makedirs(os.path.dirname(TOUCH_FILE_PATH), exist_ok=True)
 
-bots = {}  # type: Dict[str, ChatBot]
+bot_registry = {}  # type: Dict[str, ChatBot]
 
 default_model = "text-ada:001"
 
@@ -38,11 +38,11 @@ os.makedirs(history_dir, exist_ok=True)
 
 
 def get_bot(user) -> ChatBot:
-    if user not in bots:
+    if user not in bot_registry.keys():
         history_path = os.path.join(history_dir, f'history_{user}.json')
         new_bot = ChatBot(conversations_history_path=history_path, model=default_model, user=user)
-        bots[user] = new_bot
-    return bots[user]
+        bot_registry[user] = new_bot
+    return bot_registry[user]
 
 
 def send_message_with_markdown(message_to_reply_to, message, enable_markdown=False, escape_markdown_flag=False):
@@ -113,7 +113,7 @@ def button_callback(update, context):
     bot = get_bot(user)
 
     if prompt.startswith('/'):
-        command, qargs, qkwargs = bot.parse_query(prompt)
+        command, qargs, qkwargs = parse_query(prompt)
         method_name = bot.command_registry.get_function(command)
         method = getattr(bot, method_name)
         result = method(*qargs, **qkwargs)
@@ -178,6 +178,30 @@ If the error persists, you can also try /new_chat command to start a new convers
     update.message.reply_text(error_message)
 
 
+ANNOUNCEMENT_TEMPLATE = """
+Hey, this is an announcement from @petr_lavrov.
+{message}
+P.s. yes, I am shamelessly abusing my powers to send you this message.
+AND I HAVE NOT YET IMPLEMENTED THE OPTION TO DISABLE THIS MESSAGING
+Please use /stop_announcements command to stop receiving these messages.
+Please use /stop command to stop EVERYTHING.
+"""
+
+
+def announce_command(update: Update, context: CallbackContext):
+    user = update.effective_user.username
+    if user == "petr_lavrov":
+        message = update.message.text
+        message = message.replace("/announce", "").strip()
+        message = ANNOUNCEMENT_TEMPLATE.format(message=message)
+        for user in bot_registry.values():
+            # send_message(user, message)
+            # todo: implement user registry! Can't send messages to users without that!
+            raise NotImplementedError
+    else:
+        update.message.reply_text("Haaa, you sneaky! You can't do that!")
+
+
 def make_command_handler(method_name):
     def command_handler(update: Update, context: CallbackContext) -> None:
         user = update.effective_user.username
@@ -185,7 +209,7 @@ def make_command_handler(method_name):
         method = bot.__getattribute__(method_name)
 
         prompt = update.message.text
-        command, qargs, qkwargs = bot.parse_query(prompt)
+        command, qargs, qkwargs = parse_query(prompt)
         # todo: if necessary args are missing, ask for them or at least handle the exception gracefully
         result = method(*qargs, **qkwargs)  # todo: parse kwargs from the command
         if not result:
@@ -225,6 +249,7 @@ def main(expensive: bool) -> None:
                 function_name = telegram_commands_registry.get_function(command)
                 command_handler = make_command_handler(function_name)
         dispatcher.add_handler(CommandHandler(command.lstrip('/'), command_handler))
+    dispatcher.add_handler(CommandHandler("/announce", announce_command))
 
     # Add the callback handler to the dispatcher
     dispatcher.add_handler(CallbackQueryHandler(button_callback))

@@ -6,11 +6,11 @@ import os.path
 import pprint
 from functools import cached_property
 
-from openai_wrapper import get_openai_wrapper, DEFAULT_QUERY_CONFIG
 from random_word import RandomWords
 from telegram.utils.helpers import escape_markdown
 
 from chatgpt_enhancer_bot.utils import try_guess_topic_name
+from openai_wrapper import get_openai_wrapper, DEFAULT_QUERY_CONFIG
 from .command_registry import CommandRegistry
 
 openai_wrapper = get_openai_wrapper()
@@ -101,6 +101,7 @@ class ChatBot:  # todo: rename to OpenAIChatbot
     @telegram_commands_registry.register(group='configs')
     def set_temperature(self, temperature: float):
         """ Set temperature for the model """
+        temperature = float(temperature)
         if not 0 <= temperature <= 1:
             raise ValueError("Temperature must be in [0, 1]")
         self._query_config.temperature = temperature
@@ -335,40 +336,6 @@ class ChatBot:  # todo: rename to OpenAIChatbot
             num_items += 1
         return num_items
 
-    @staticmethod
-    def parse_query(query):
-        """format: "/command arg text key1=arg1 key2=arg2" """
-        args = []
-        kwargs = {}
-        query = query.strip()
-
-        if query.startswith('/'):
-            if ' ' not in query:
-                return query, args, kwargs
-            command, query = query.split(' ', 1)
-        else:
-            raise RuntimeError(f"command not included? {query}")
-
-        if '=' not in query:
-            return command, [query], kwargs
-
-        parts = query.strip().split('=')
-
-        # parse arg
-        arg, key = parts[0].rsplit(' ', 1)
-        arg = arg.strip()
-        if arg:
-            args.append(arg)
-
-        # parse kwargs
-        for part in parts[1:-1]:
-            value, next_key = part.rsplit(' ', 1)
-            kwargs[key] = value.strip()
-            key = next_key
-        kwargs[key] = parts[-1].strip()
-
-        return command, args, kwargs
-
     @telegram_commands_registry.register('/start', group='basic')
     def start(self):
         """Send a message when the command /start is issued, initiate the bot"""
@@ -506,6 +473,21 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         :return:
         """
         return openai_wrapper.query_cheap(prompt, config=self._query_config, **kwargs)
+
+    @telegram_commands_registry.register(group='custom')
+    def edit(self, prompt, instruction=None, **kwargs):
+        """
+        Modify prompt using instruction
+        Calls openai Edit.create API method
+        using text-davinci-edit-001 model
+        https://beta.openai.com/docs/api-reference/edit/create
+        """
+        if instruction is None:
+            if '\n' in prompt:
+                instruction, prompt = prompt.split('\n', 1)
+            else:
+                instruction, prompt = prompt, ""
+        return openai_wrapper.edit(prompt, instruction=instruction, config=self._query_config, **kwargs)
 
     # def get_code(self, prompt, model='', **kwargs):
     #     """
