@@ -523,6 +523,21 @@ class ChatBot:  # todo: rename to OpenAIChatbot
         """
         return openai_wrapper.query_cheap(prompt, config=self._query_config, **kwargs)
 
+    @telegram_commands_registry.register(group='custom')
+    def edit(self, prompt, instruction=None, **kwargs):
+        """
+        Modify prompt using instruction
+        Calls openai Edit.create API method
+        using text-davinci-edit-001 model
+        https://beta.openai.com/docs/api-reference/edit/create
+        """
+        if instruction is None:
+            if '\n' in prompt:
+                instruction, prompt = prompt.split('\n', 1)
+            else:
+                instruction, prompt = prompt, ""
+        return openai_wrapper.edit(prompt, instruction=instruction, config=self._query_config, **kwargs)
+
     # def get_code(self, prompt, model='', **kwargs):
     #     """
     #     Get code from openai_wrapper model
