@@ -69,6 +69,8 @@ def send_message_to_user(message_to_reply_to, message):
     blocks = split_to_code_blocks(message)
     sent_messages = []
     for block in blocks:
+        if not block['text'].strip():
+            continue
         if block['is_code_block']:
             text = f"```{block['text']}```"
         else:

@@ -6,9 +6,9 @@ from chatgpt_enhancer_bot.utils import split_to_code_blocks
 @pytest.mark.parametrize("text,expected", [
     ("some text ```some code``` some more text",
      [
-         {'text': 'some text ', 'is_code_block': False},
+         {'text': 'some text', 'is_code_block': False},
          {'text': 'some code', 'is_code_block': True},
-         {'text': ' some more text', 'is_code_block': False}
+         {'text': 'some more text', 'is_code_block': False}
      ]),
     ("", []),
     ("```some code```", [{'text': 'some code', 'is_code_block': True}]),

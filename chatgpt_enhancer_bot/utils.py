@@ -41,10 +41,9 @@ def split_to_code_blocks(text):
     is_code_block = False
     blocks = []
     for block in text.split("```"):
-        if block:
+        if block.strip():
             blocks.append(
-
-                {"text": block,
+                {"text": block.strip(),
                  "is_code_block": is_code_block}
             )
         is_code_block = not is_code_block
