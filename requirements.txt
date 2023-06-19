@@ -1,4 +1,4 @@
 openai
 python-telegram-bot
 random-word
-openai_wrapper
+python-dotenv
