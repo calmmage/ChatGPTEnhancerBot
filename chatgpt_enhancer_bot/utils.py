@@ -1,6 +1,5 @@
 import os
 import random
-from dotenv import load_dotenv
 
 
 def try_guess_topic_name(name, candidates):
@@ -11,25 +10,6 @@ def try_guess_topic_name(name, candidates):
     if len(matches) == 1:
         return matches[0]
     return None
-
-
-def get_secrets():
-    load_dotenv()  # Load environment variables from .env file
-    # Load the secrets from a file
-    secrets = {}
-    secrets_path = os.path.join(os.path.dirname(__file__), 'secrets.txt')
-    with open(secrets_path, "r") as f:
-        for line in f:
-            key, value = line.strip().split(":", 1)
-            secrets[key] = value
-
-    # Overwrite with environment variables if available
-    secrets["openai_api_key"] = os.getenv("openai_api_key",
-                                          secrets.get("openai_api_key"))
-    secrets["telegram_api_token"] = os.getenv("telegram_api_token",
-                                              secrets.get("telegram_api_token"))
-
-    return secrets
 
 
 reasons_path = os.path.join(os.path.dirname(__file__), 'resources/reasons.txt')

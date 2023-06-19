@@ -11,21 +11,24 @@ import traceback
 from pathlib import Path
 from typing import Dict, Optional
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, Bot
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
+from dotenv import load_dotenv
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, \
+    BotCommand, Bot
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, \
+    CallbackContext, CallbackQueryHandler
 from telegram.utils.helpers import escape_markdown
 
 from chatgpt_enhancer_bot.bot.chat_registry import ChatType
 from chatgpt_enhancer_bot.bot.user_registry import UserRegistry
 from chatgpt_enhancer_bot.command_registry import CommandRegistry
 from .openai_chatbot import ChatBot, gpt_commands_registry, WELCOME_MESSAGE
-from .utils import get_secrets, generate_funny_reason, generate_funny_consolation, split_to_code_blocks, parse_query
-
-secrets = get_secrets()
+from .utils import generate_funny_reason, generate_funny_consolation, \
+    split_to_code_blocks, parse_query
 
 # Enable logging
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
 )
 
 logger = logging.getLogger(__name__)
@@ -44,12 +47,15 @@ history_dir.mkdir(parents=True, exist_ok=True)
 def get_bot(user) -> ChatBot:
     if user not in bot_registry.keys():
         history_path = os.path.join(history_dir, f'history_{user}.json')
-        new_bot = ChatBot(conversations_history_path=history_path, model=default_model, user=user)
+        new_bot = ChatBot(conversations_history_path=history_path,
+                          model=default_model, user=user)
         bot_registry[user] = new_bot
     return bot_registry[user]
 
 
-def send_message_with_markdown(message_to_reply_to, message, enable_markdown=False, escape_markdown_flag=False):
+def send_message_with_markdown(message_to_reply_to, message,
+                               enable_markdown=False,
+                               escape_markdown_flag=False):
     if enable_markdown:
         if escape_markdown_flag:
             message = escape_markdown(message, version=2)
@@ -73,7 +79,8 @@ def send_message_to_user(message_to_reply_to, message):
             text = f"```{block['text']}```"
         else:
             text = block['text']
-        msg = send_message_with_markdown(message_to_reply_to, text, enable_markdown=block['is_code_block'])
+        msg = send_message_with_markdown(message_to_reply_to, text,
+                                         enable_markdown=block['is_code_block'])
         sent_messages.append(msg)
 
     if len(sent_messages) == 1:
@@ -100,7 +107,8 @@ def build_menu(buttons, n_cols, header_buttons=None, footer_buttons=None):
 
 
 def send_menu(update, context, menu: dict, message, n_cols=2):
-    button_list = [InlineKeyboardButton(k, callback_data=v) for k, v in menu.items()]
+    button_list = [InlineKeyboardButton(k, callback_data=v) for k, v in
+                   menu.items()]
     reply_markup = InlineKeyboardMarkup(build_menu(button_list, n_cols=n_cols))
     update.message.reply_text(message, reply_markup=reply_markup)
 
@@ -108,7 +116,8 @@ def send_menu(update, context, menu: dict, message, n_cols=2):
 def topics_menu_command(update: Update, context: CallbackContext) -> None:
     user = update.effective_user.username
     bot = get_bot(user)
-    send_menu(update, context, bot.get_topics_menu(), "Choose a topic to switch to:")
+    send_menu(update, context, bot.get_topics_menu(),
+              "Choose a topic to switch to:")
 
 
 def button_callback(update, context):
@@ -136,7 +145,9 @@ def button_callback(update, context):
 
 
 # Enable logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO)
 
 
 def error_handler(update: Update, context: CallbackContext):
@@ -150,7 +161,8 @@ def error_handler(update: Update, context: CallbackContext):
         prompt = update.message.text
     elif update.callback_query:
         prompt = update.callback_query.data
-    bot.save_error(timestamp=timestamp, error=context.error, traceback=traceback.format_exc(),
+    bot.save_error(timestamp=timestamp, error=context.error,
+                   traceback=traceback.format_exc(),
                    message_text=prompt)
     # todo: make save_error also save error to file somewhere
     logger.warning(traceback.format_exc())
@@ -204,13 +216,15 @@ def make_command_handler(method_name):
         prompt = update.message.text
         command, qargs, qkwargs = parse_query(prompt)
         # todo: if necessary args are missing, ask for them or at least handle the exception gracefully
-        result = method(*qargs, **qkwargs)  # todo: parse kwargs from the command
+        result = method(*qargs,
+                        **qkwargs)  # todo: parse kwargs from the command
         if not result:
             result = f"Command {command} finished successfully"
         # escape_markdown_flag = not bot.command_registry.is_markdown_safe(command)
         # response_message = send_message_to_user(update.effective_message, result, enable_markdown=bot.markdown_enabled,
         #                                         escape_markdown_flag=escape_markdown_flag)
-        response_message = send_message_to_user(update.effective_message, result)
+        response_message = send_message_to_user(update.effective_message,
+                                                result)
         if result.startswith("Active topic"):
             response_message.pin()
 
@@ -221,7 +235,8 @@ telegram_commands_registry = CommandRegistry()
 
 
 class TelegramBot:
-    def __init__(self, token=None, root_dir=None, user_registry: Optional[UserRegistry] = None):
+    def __init__(self, token=None, root_dir=None,
+                 user_registry: Optional[UserRegistry] = None):
         if token is None:
             # get token from env variables
             token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -230,6 +245,8 @@ class TelegramBot:
             root_dir = 'app_data'
         root_dir = Path(root_dir)
         self._root_dir = root_dir
+        if not root_dir.exists():
+            root_dir.mkdir(parents=True)
         if user_registry is None:
             user_registry_path = root_dir / 'users'
             user_registry = UserRegistry(user_registry_path)
@@ -250,15 +267,19 @@ class TelegramBot:
 
     def setup(self, expensive=False):
         # todo: make this univesal for all commands, support Logic module
-        globals()['default_model'] = "text-davinci-003" if expensive else "text-ada:001"
+        globals()[
+            'default_model'] = "text-davinci-003" if expensive else "text-ada:001"
         # on non command i.e message - echo the message on Telegram
-        self._add_handler(MessageHandler(Filters.text & ~Filters.command, chat_handler))
+        self._add_handler(
+            MessageHandler(Filters.text & ~Filters.command, chat_handler))
 
-        self._register_commands(telegram_commands_registry, self.__getattribute__)
+        self._register_commands(telegram_commands_registry,
+                                self.__getattribute__)
         self._register_commands(gpt_commands_registry, make_command_handler)
 
         # Add the callback handler to the dispatcher
-        self._add_handler(CommandHandler("get_topics_menu", topics_menu_command))
+        self._add_handler(
+            CommandHandler("get_topics_menu", topics_menu_command))
         self._add_handler(CallbackQueryHandler(button_callback))
 
         self._dispatcher.bot.set_my_commands(self._commands_names)
@@ -267,7 +288,8 @@ class TelegramBot:
         self._dispatcher.add_error_handler(error_handler)
 
         # order important - this must be after /start command
-        self._dispatcher.add_handler(MessageHandler(Filters.update, self.auto_register_new_chats))
+        self._dispatcher.add_handler(
+            MessageHandler(Filters.update, self.auto_register_new_chats))
 
     def _register_commands(self, command_registry, command_factory):
         for command in command_registry.list_commands():
@@ -275,7 +297,8 @@ class TelegramBot:
                 continue
             function_name = command_registry.get_function(command)
             command_handler = command_factory(function_name)
-            self._dispatcher.add_handler(CommandHandler(command.lstrip('/'), command_handler))
+            self._dispatcher.add_handler(
+                CommandHandler(command.lstrip('/'), command_handler))
 
         # Update commands list
         self._commands_names += [
@@ -433,15 +456,16 @@ class TelegramBot:
             update.message.reply_text("Haaa, you sneaky! You can't do that!")
 
 
-def main(expensive: bool) -> None:
+def main(expensive: bool, root_dir=None) -> None:
     """
     Start the bot
     :param expensive: Use 'text-davinci-003' model instead of 'text-ada:001'
     :return:
     """
     # Create the Updater and pass it your bot's token.
-    token = secrets["telegram_api_token"]
-    bot = TelegramBot(token=token)
+    load_dotenv()
+    token = os.getenv("TELEGRAM_TOKEN")
+    bot = TelegramBot(token=token, root_dir=root_dir)
     bot.setup(expensive=expensive)
     bot.run()
 
@@ -452,6 +476,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--expensive", action="store_true",
                         help="use expensive calculation - 'text-davinci-003' model instead of 'text-ada:001' ")
+    parser.add_argument("--root-dir", type=str, default=None)
     args = parser.parse_args()
 
-    main(expensive=args.expensive)
+    main(expensive=args.expensive, root_dir=args.root_dir)

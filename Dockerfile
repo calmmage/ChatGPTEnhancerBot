@@ -18,4 +18,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Start command
-CMD ["python", "run.py", "--expensive"]
+CMD ["python", "run.py", "--expensive", "--root-dir",
+"/app_data/gpt_enhancer_bot"]
