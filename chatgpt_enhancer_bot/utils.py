@@ -52,7 +52,9 @@ def split_to_code_blocks(text):
 
 
 def parse_query(query: str):
-    """format: "/command arg text key1=arg1 key2=arg2\n Long text arg" """
+    """
+    A util to parse a text message into content, args and kwargs.
+    format: "/command arg text key1=arg1 key2=arg2\n Long text arg" """
     args = []
     kwargs = {}
     query = query.strip()
